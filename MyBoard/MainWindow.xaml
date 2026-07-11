@@ -6,7 +6,19 @@
         xmlns:local="clr-namespace:MyBoard"
         mc:Ignorable="d"
         Title="MainWindow" Height="450" Width="800">
+    
+    <!--Grid Definitions-->
     <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="20"/>
+            <RowDefinition Height="40"/>
+            <RowDefinition/>
+        </Grid.RowDefinitions>
 
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="40"/>
+            <ColumnDefinition/>
+        </Grid.ColumnDefinitions>
+        
     </Grid>
 </Window>
