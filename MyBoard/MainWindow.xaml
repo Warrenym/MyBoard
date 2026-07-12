@@ -1,24 +1,148 @@
-﻿<Window x:Class="MyBoard.MainWindow"
+﻿
+    <Window x:Class="MyBoard.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:MyBoard"
+        xmlns:vm="clr-namespace:MyBoard.ViewModel"
+        xmlns:behaviors="clr-namespace:MyBoard.Behaviors"
         mc:Ignorable="d"
         Title="MainWindow" Height="450" Width="800">
-    
+        
     <!--Grid Definitions-->
     <Grid>
         <Grid.RowDefinitions>
-            <RowDefinition Height="20"/>
-            <RowDefinition Height="40"/>
-            <RowDefinition/>
+            <RowDefinition Height="Auto"/> <!--breadcrumb-->
+            <RowDefinition Height="Auto"/> <!--board title-->
+            <RowDefinition Height="*"/> <!--main content-->
         </Grid.RowDefinitions>
 
-        <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="40"/>
-            <ColumnDefinition/>
-        </Grid.ColumnDefinitions>
+        <!--Row 0: Home and Breadcrumb-->
+        <DockPanel Grid.Row="0" Background="White" Height="48">
+            <ItemsControl ItemsSource="{Binding BreadcrumbTrail}" Margin="16,0">
+                <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate>
+                        <StackPanel Orientation="Horizontal"/>
+                    </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="{Binding Title}"
+                               VerticalAlignment="Center"
+                               Cursor="Hand">
+                                <TextBlock.InputBindings>
+                                    <MouseBinding MouseAction="LeftClick"
+                                          Command="{Binding DataContext.NavigateToBreadcrumbCommand,
+                                                    RelativeSource={RelativeSource AncestorType=Window}}"
+                                          CommandParameter="{Binding}"/>
+                                </TextBlock.InputBindings>
+                            </TextBlock>
+                            <TextBlock Text=" / " VerticalAlignment="Center" Foreground="Gray"/>
+                        </StackPanel>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+        </DockPanel>
+
+        <!--Row 1: Current Board Title-->
+        <TextBlock Grid.Row="1" Text="{Binding CurrentBoard.Title}"
+                   FontSize="20" FontWeight="Bold"
+                   HorizontalAlignment="Center" Margin="0,10"/>
         
+        <!--Row 2: Sidebar and Canvas-->
+        <Grid Grid.Row="2">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="80"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+            
+            <!--Left tool Panel-->
+            <!-- Left tool panel -->
+            <StackPanel Grid.Column="0" Background="#F5F5F5">
+                <Button Content="Note" Command="{Binding AddNoteCommand}" Margin="8"/>
+                <Button Content="Board" Command="{Binding AddBoardCommand}" Margin="8"/>
+            </StackPanel>
+
+
+            <!--Canvas Area-->
+            <!-- Canvas area: renders whatever is inside CurrentBoard.Items -->
+            <ItemsControl x:Name="BoardCanvas"
+                          Grid.Column="1"
+                          ItemsSource="{Binding CurrentBoard.Items}"
+                          AllowDrop="True"
+                          DragEnter="BoardCanvas_DragEnter"
+                          Drop="BoardCanvas_Drop">
+
+                <!-- Use a Canvas so items can be positioned freely via X/Y -->
+                <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate>
+                        <Canvas Background="#FAFAFA"/>
+                    </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+
+                <!-- Positions each item's container using its bound X/Y -->
+                <!-- Positions each item using X/Y, and enables drag via the attached behavior -->
+                <ItemsControl.ItemContainerStyle>
+                    <Style TargetType="ContentPresenter">
+                        <Setter Property="Canvas.Left" Value="{Binding X}"/>
+                        <Setter Property="Canvas.Top" Value="{Binding Y}"/>
+                        <Setter Property="behaviors:DraggableBehavior.IsDraggable" Value="True"/>
+                    </Style>
+                </ItemsControl.ItemContainerStyle>
+
+                <!-- Picks the correct visual based on the ViewModel's runtime type -->
+                <ItemsControl.Resources>
+                    <DataTemplate DataType="{x:Type vm:NoteItemViewModel}">
+                        <Border Background="#FFF9C4" Padding="10" MinWidth="150">
+                            <TextBox Text="{Binding Content}"
+                         TextWrapping="Wrap"
+                         BorderThickness="0"
+                         Background="Transparent"/>
+                        </Border>
+                    </DataTemplate>
+
+                    <!-- Visual for a Board sitting on a parent canvas — looks like a folder tile -->
+                    <DataTemplate DataType="{x:Type vm:BoardViewModel}">
+                        <StackPanel Width="120" Cursor="Hand">
+                            <StackPanel.InputBindings>
+                                <!-- Double-click opens the board, so single-click still allows dragging -->
+                                <MouseBinding MouseAction="LeftDoubleClick"
+                          Command="{Binding DataContext.NavigateToBoardCommand,
+                                    RelativeSource={RelativeSource AncestorType=Window}}"
+                          CommandParameter="{Binding}"/>
+                            </StackPanel.InputBindings>
+
+                            <Border Background="#B39DDB" CornerRadius="8" Height="70">
+                                <TextBlock Text="📁" FontSize="28"
+                                           HorizontalAlignment="Center"
+                                           VerticalAlignment="Center"/>
+                            </Border>
+
+                            <TextBlock Text="{Binding Title}"
+                                       FontWeight="Bold"
+                                       HorizontalAlignment="Center"
+                                       Margin="0,4,0,0"/>
+
+                            <TextBlock Text="{Binding Items.Count, StringFormat={}{0} items}"
+                                       FontSize="11" Foreground="Gray"
+                                       HorizontalAlignment="Center"/>
+                        </StackPanel>
+                    </DataTemplate>
+
+                    <!-- Visual for an ImageItem — displays the image at its FilePath -->
+                    <DataTemplate DataType="{x:Type vm:ImageItemViewModel}">
+                        <Border BorderBrush="#DDD" BorderThickness="1" Background="White">
+                            <Image Source="{Binding FilePath}"
+                                   Stretch="Uniform"
+                                   MaxWidth="250" MaxHeight="250"/>
+                        </Border>
+                    </DataTemplate>
+                </ItemsControl.Resources>
+            </ItemsControl>
+
+
+        </Grid>
     </Grid>
 </Window>
