@@ -5,6 +5,7 @@ using System.Text;
 using System.Text.RegularExpressions;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
 using System.Windows.Data;
 using System.Windows.Documents;
 using System.Windows.Input;
@@ -22,6 +23,7 @@ namespace MyBoard
         {
             InitializeComponent();
             DataContext = new MainViewModel(); // Root ViewModel drives the whole window
+            PreviewKeyDown += MainWindow_PreviewKeyDown;
         }
 
         // Called continuously while something is dragged over the canvas — decides whether to show the "can drop here" cursor
@@ -40,7 +42,9 @@ namespace MyBoard
         private async void BoardCanvas_Drop(object sender, DragEventArgs e)
         {
             var viewModel = (ViewModel.MainViewModel)DataContext;
-            Point dropPosition = e.GetPosition(BoardCanvas);
+            Point rawPosition = e.GetPosition(CanvasViewport);
+            Point dropPosition = new(rawPosition.X / viewModel.ZoomLevel,
+                                     rawPosition.Y / viewModel.ZoomLevel);
 
 
             // Case 1: File Explorer — real file paths
@@ -112,5 +116,45 @@ namespace MyBoard
             return null;
         }
 
+        // Zooms the canvas in/out on mouse wheel — no modifier key required.
+        // Clamped between 20% and 300% so content can't disappear or become unusably huge.
+        private void BoardCanvas_MouseWheel(object sender, MouseWheelEventArgs e)
+        {
+            var viewModel = (ViewModel.MainViewModel)DataContext;
+
+            double change = e.Delta > 0 ? 0.1 : -0.1; // Scroll up = zoom in, scroll down = zoom out
+            viewModel.ZoomLevel = Math.Clamp(viewModel.ZoomLevel + change, 0.2, 3.0);
+
+            e.Handled = true; // Prevents the scroll from also trying to scroll a parent container
+        }
+
+        // Shared handler for both Note and Image resize thumbs.
+        // Thumb.DragDelta already reports values in the item's local coordinate space, automatically accounting for the canvas's zoom transform — no manual scaling needed
+        private void ResizeThumb_DragDelta(object sender, DragDeltaEventArgs e)
+        {
+            if (sender is not Thumb thumb) return;
+            if (thumb.DataContext is not IResizable resizable) return;
+
+            resizable.Width = Math.Max(60, resizable.Width + e.HorizontalChange);
+            resizable.Height = Math.Max(40, resizable.Height + e.VerticalChange);
+        }
+
+        // Fires only when clicking empty canvas space — item clicks are already marked Handled by DraggableBehavior, so they never reach this handler
+        private void CanvasViewport_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+        {
+            var viewModel = (ViewModel.MainViewModel)DataContext;
+            viewModel.CurrentBoard.ClearSelection();
+        }
+
+
+        // Deletes the selected item on Delete/Backspace — but only when the user isn't actively typing in a TextBox, so editing note text still works normally
+        private void MainWindow_PreviewKeyDown(object sender, KeyEventArgs e)
+        {
+            if (e.Key != Key.Delete) return;
+            if (Keyboard.FocusedElement is TextBox) return; // Let the TextBox handle it instead
+
+            var viewModel = (ViewModel.MainViewModel)DataContext;
+            viewModel.CurrentBoard.DeleteSelectedItem();
+        }
     }
 }

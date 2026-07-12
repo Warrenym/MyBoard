@@ -6,9 +6,11 @@ using System.Text;
 
 namespace MyBoard.ViewModel
 {
-    internal partial class ImageItemViewModel : ObservableObject, IPositionable
+    internal partial class ImageItemViewModel : ObservableObject, IPositionable, IResizable, ISelectable, ICanvasItemViewModel
     {
         public ImageItem Model { get; }
+
+        ICanvasItem ICanvasItemViewModel.Model => Model;
 
         [ObservableProperty]
         private double x;
@@ -17,17 +19,30 @@ namespace MyBoard.ViewModel
         private double y;
 
         [ObservableProperty]
+        private double width;
+
+        [ObservableProperty]
+        private double height;
+
+        [ObservableProperty]
         private string filePath;
+
+        [ObservableProperty]
+        private bool isSelected;
 
         public ImageItemViewModel(ImageItem model)
         {
             Model = model;
             x = model.X;
             y = model.Y;
+            width = model.Width;
+            height = model.Height;
             filePath = model.FilePath;
         }
 
         partial void OnXChanged(double value) => Model.X = value;
         partial void OnYChanged(double value) => Model.Y = value;
+        partial void OnWidthChanged(double value) => Model.Width = value;
+        partial void OnHeightChanged(double value) => Model.Height = value;
     }
 }

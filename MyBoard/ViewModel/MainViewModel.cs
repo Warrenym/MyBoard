@@ -13,6 +13,10 @@ namespace MyBoard.ViewModel
         [ObservableProperty]
         private BoardViewModel currentBoard; // The board currently shown on the canvas
 
+        // Controls how zoomed-in the canvas is — bound to a ScaleTransform in the View. 1.0 = 100%, clamped between 20% and 300% so users can't zoom to nothing or absurdly far in.
+        [ObservableProperty]
+        private double zoomLevel = 1.0;
+
         //The navigation trail
         public ObservableCollection<BoardViewModel> BreadcrumbTrail { get; } = new();
 

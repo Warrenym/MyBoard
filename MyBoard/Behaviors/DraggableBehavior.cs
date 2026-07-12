@@ -2,6 +2,7 @@
 using System;
 using System.Collections.Generic;
 using System.Text;
+using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Input;
 
@@ -48,19 +49,53 @@ namespace MyBoard.Behaviors
             }
         }
 
-        // Begins the drag — records starting mouse position and captures the mouse
-        // so movement is tracked even if the cursor leaves the element's bounds
+        // Tracks the last click's time and target, to distinguish a real double-click
+        // (two clicks in quick succession) from two separate, deliberate single clicks.
+        private static DateTime lastClickTime = DateTime.MinValue;
+        private static object? lastClickedItem;
+
+        // Handles both selection and board-opening:
+        // - Any click selects the item (or re-selects it, if already selected).
+        // - A SECOND click within the OS's double-click time window on the SAME item opens it.
+        // - A click after a pause — even on the same item — is treated as a fresh single click.
         private static void Element_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
         {
             var element = (FrameworkElement)sender;
+            var clickedItem = element.DataContext;
+
+            DateTime now = DateTime.Now;
+            double millisecondsSinceLastClick = (now - lastClickTime).TotalMilliseconds;
+
+            [DllImport("user32.dll")]
+            static extern int GetDoubleClickTime();
+
+            // SystemParameters.DoubleClickTime respects the user's actual OS double-click speed setting
+            bool isRealDoubleClick = ReferenceEquals(clickedItem, lastClickedItem)
+                                     && millisecondsSinceLastClick <= GetDoubleClickTime();
+
+            lastClickTime = now;
+            lastClickedItem = clickedItem;
+
+            if (Window.GetWindow(element)?.DataContext is ViewModel.MainViewModel mainViewModel)
+            {
+                if (isRealDoubleClick && clickedItem is ViewModel.BoardViewModel boardToOpen)
+                {
+                    mainViewModel.NavigateToBoardCommand.Execute(boardToOpen);
+                    lastClickTime = DateTime.MinValue; // Reset so opening doesn't chain into another open
+                    e.Handled = true;
+                    return;
+                }
+
+                mainViewModel.CurrentBoard.SelectItem(clickedItem);
+            }
+
             isDragging = true;
             lastMousePosition = e.GetPosition(GetCanvasParent(element));
             element.CaptureMouse();
-            e.Handled = true; // Prevents click-through to items behind, e.g. text selection
+            e.Handled = true;
         }
 
-        // While dragging, calculates how far the mouse moved since the last event
-        // and applies that delta directly to the bound ViewModel's X/Y
+        // While dragging, calculates how far the mouse moved since the last event and applies that delta directly to the bound ViewModel's X/Y
         private static void Element_MouseMove(object sender, MouseEventArgs e)
         {
             if (!isDragging) return;
