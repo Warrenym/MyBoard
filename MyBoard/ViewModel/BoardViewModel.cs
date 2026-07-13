@@ -29,6 +29,11 @@ namespace MyBoard.ViewModel
         [ObservableProperty]
         private object? selectedItem;
 
+        // Tracks whether this board's title is currently being edited (TextBox visible).
+        // Not persisted — always starts false, except immediately after creation.
+        [ObservableProperty]
+        private bool isEditingTitle;
+
         public ObservableCollection<object> Items { get; } = new();
 
         public BoardViewModel(Board model)
@@ -64,11 +69,24 @@ namespace MyBoard.ViewModel
         }
 
         // Creates a new sub-Board, adds it the same way notes are added.
-        public void AddBoard()
+        public BoardViewModel AddBoard()
         {
-            var board = new Board { Title = "New Board", X = 100, Y = 250, ParentBoardId = Model.Id };
+            var board = new Board { Title = "Unnamed Board", X = 100, Y = 250, ParentBoardId = Model.Id };
             Model.Items.Add(board);
-            Items.Add(new BoardViewModel(board));
+
+            var boardViewModel = new BoardViewModel(board);
+            Items.Add(boardViewModel);
+            boardViewModel.IsEditingTitle = true;
+
+            return boardViewModel;
+        }
+
+        // Exits title-editing mode. If the user left it blank, defaults to "Unnamed Board"
+        public void CommitTitle()
+        {
+            if (string.IsNullOrWhiteSpace(Title))
+                Title = "Unnamed Board";
+            IsEditingTitle = false;
         }
 
         // Creates a new ImageItem at the given position — used by drag-and-drop.
@@ -79,16 +97,38 @@ namespace MyBoard.ViewModel
             Items.Add(new ImageItemViewModel(image));
         }
 
-        // Selects the given item and deselects everything else on this board.
+        // Tracks every currently selected item on this board (supports multi-select).
+        // Kept in sync with each item's own IsSelected flag, which drives the highlight border.
+        public ObservableCollection<object> SelectedItems { get; } = new();
+
+        // Selects a single item, replacing any existing selection.
+        // Used for a normal single click.
         public void SelectItem(object item)
         {
             foreach (var existing in Items.OfType<ISelectable>())
                 existing.IsSelected = false;
+            SelectedItems.Clear();
 
             if (item is ISelectable selectable)
                 selectable.IsSelected = true;
 
-            SelectedItem = item;
+            SelectedItems.Add(item);
+        }
+
+        // Selects a whole set of items at once, replacing any existing selection.
+        // Used by the drag-box multi-select.
+        public void SelectItems(IEnumerable<object> items)
+        {
+            foreach (var existing in Items.OfType<ISelectable>())
+                existing.IsSelected = false;
+            SelectedItems.Clear();
+
+            foreach (var item in items)
+            {
+                if (item is ISelectable selectable)
+                    selectable.IsSelected = true;
+                SelectedItems.Add(item);
+            }
         }
 
         // Deselects everything — called when clicking empty canvas space
@@ -96,22 +136,22 @@ namespace MyBoard.ViewModel
         {
             foreach (var existing in Items.OfType<ISelectable>())
                 existing.IsSelected = false;
-
-            SelectedItem = null;
+            SelectedItems.Clear();
         }
 
-        // Removes the currently selected item from both the display collection
-        // and the underlying Model, so the deletion persists once save/load exists
-        public void DeleteSelectedItem()
+        // Removes every currently selected item from both the display collection
+        // and the underlying Model — now handles multiple items at once
+        public void DeleteSelectedItems()
         {
-            if (SelectedItem is ICanvasItemViewModel canvasItemVm)
-                Model.Items.Remove(canvasItemVm.Model);
-
-            if (SelectedItem != null)
-                Items.Remove(SelectedItem);
-
-            SelectedItem = null;
+            foreach (var item in SelectedItems.ToList()) // ToList() avoids mutating while iterating
+            {
+                if (item is ICanvasItemViewModel canvasItemVm)
+                    Model.Items.Remove(canvasItemVm.Model);
+                Items.Remove(item);
+            }
+            SelectedItems.Clear();
         }
+
 
 
     }

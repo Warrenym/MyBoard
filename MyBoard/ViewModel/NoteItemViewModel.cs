@@ -29,8 +29,13 @@ namespace MyBoard.ViewModel
         [ObservableProperty]
         private string content;
 
+        // Drives the highlight border in the DataTemplate
         [ObservableProperty]
-        private bool isSelected; // Drives the highlight border in the DataTemplate
+        private bool isSelected;
+
+        // Tracks whether this note is currently in edit mode (TextBox visible)
+        [ObservableProperty]
+        private bool isEditing;
 
         public NoteItemViewModel(NoteItem model)
         {

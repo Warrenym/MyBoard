@@ -9,9 +9,19 @@
         xmlns:behaviors="clr-namespace:MyBoard.Behaviors"
         mc:Ignorable="d"
         Title="MainWindow" Height="450" Width="800">
+
+    
+    <Window.Resources>
+        <!-- Converts bool -> Visibility, used to show sidebar labels only while expanded -->
+        <BooleanToVisibilityConverter x:Key="BoolToVis"/>
+    </Window.Resources>
+        
         
     <!--Grid Definitions-->
-    <Grid>
+    <Grid x:Name="RootGrid"
+          Focusable="True"
+          PreviewMouseLeftButtonDown="RootGrid_PreviewMouseLeftButtonDown"
+          PreviewMouseLeftButtonUp="RootGrid_PreviewMouseLeftButtonUp">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/> <!--breadcrumb-->
             <RowDefinition Height="Auto"/> <!--board title-->
@@ -19,7 +29,7 @@
         </Grid.RowDefinitions>
 
         <!--Row 0: Home and Breadcrumb-->
-        <DockPanel Grid.Row="0" Background="White" Height="48">
+        <DockPanel Grid.Row="0" Background="{StaticResource SidebarBrush}" Height="48">
             <ItemsControl ItemsSource="{Binding BreadcrumbTrail}" Margin="16,0">
                 <ItemsControl.ItemsPanel>
                     <ItemsPanelTemplate>
@@ -29,17 +39,15 @@
                 <ItemsControl.ItemTemplate>
                     <DataTemplate>
                         <StackPanel Orientation="Horizontal">
-                            <TextBlock Text="{Binding Title}"
-                               VerticalAlignment="Center"
-                               Cursor="Hand">
+                            <TextBlock Text="{Binding Title}" Style="{StaticResource BodyText}" Cursor="Hand" VerticalAlignment="Center">
                                 <TextBlock.InputBindings>
                                     <MouseBinding MouseAction="LeftClick"
-                                          Command="{Binding DataContext.NavigateToBreadcrumbCommand,
-                                                    RelativeSource={RelativeSource AncestorType=Window}}"
-                                          CommandParameter="{Binding}"/>
+                                                  Command="{Binding DataContext.NavigateToBreadcrumbCommand,
+                                                  RelativeSource={RelativeSource AncestorType=Window}}"
+                                                  CommandParameter="{Binding}"/>
                                 </TextBlock.InputBindings>
                             </TextBlock>
-                            <TextBlock Text=" / " VerticalAlignment="Center" Foreground="Gray"/>
+                            <TextBlock Text=" / " Style="{StaticResource CaptionText}" VerticalAlignment="Center"/>
                         </StackPanel>
                     </DataTemplate>
                 </ItemsControl.ItemTemplate>
@@ -48,147 +56,261 @@
 
         <!--Row 1: Current Board Title-->
         <TextBlock Grid.Row="1" Text="{Binding CurrentBoard.Title}"
-                   FontSize="20" FontWeight="Bold"
+                   Style="{StaticResource HeaderText}"
                    HorizontalAlignment="Center" Margin="0,10"/>
-        
+
+        <!-- Thin separator between the title bar and the canvas -->
+        <Border Grid.Row="1" VerticalAlignment="Bottom"
+                BorderBrush="{StaticResource BorderBrush}"
+                BorderThickness="0,0,0,1"/>
+
         <!--Row 2: Sidebar and Canvas-->
         <Grid Grid.Row="2">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="80"/>
-                <ColumnDefinition Width="*"/>
-            </Grid.ColumnDefinitions>
             
-            <!--Left tool Panel-->
-            <!-- Left tool panel -->
-            <StackPanel Grid.Column="0" Background="#F5F5F5">
-                <Button Content="Note" Command="{Binding AddNoteCommand}" Margin="8"/>
-                <Button Content="Board" Command="{Binding AddBoardCommand}" Margin="8"/>
-            </StackPanel>
-
-
             <!--Canvas Area-->
             <!-- Canvas area: renders whatever is inside CurrentBoard.Items -->
             <!-- Viewport fills the whole column at all times — handles drop/zoom input regardless of how zoomed-out the inner canvas visually is -->
             <Border x:Name="CanvasViewport"
-                    Grid.Column="1"
-                    Background="White"
-                    ClipToBounds="True"
-                    AllowDrop="True"
-                    DragEnter="BoardCanvas_DragEnter"
-                    Drop="BoardCanvas_Drop"
-                    MouseWheel="BoardCanvas_MouseWheel"
-                    MouseLeftButtonDown="CanvasViewport_MouseLeftButtonDown">           
+                            Background="#FCFFF9"
+                            ClipToBounds="True"
+                            AllowDrop="True"
+                            DragEnter="BoardCanvas_DragEnter"
+                            Drop="BoardCanvas_Drop"
+                            MouseWheel="BoardCanvas_MouseWheel"
+                            MouseLeftButtonDown="CanvasViewport_MouseLeftButtonDown"
+                            PreviewMouseLeftButtonDown="CanvasViewport_PreviewMouseLeftButtonDown"
+                            MouseMove="CanvasViewport_MouseMove"
+                            MouseLeftButtonUp="CanvasViewport_MouseLeftButtonUp">
+                <Grid>
+                    <ItemsControl x:Name="BoardCanvas"
+                                  ItemsSource="{Binding CurrentBoard.Items}"
+                                  HorizontalAlignment="Left"
+                                  VerticalAlignment="Top">
 
-                <ItemsControl x:Name="BoardCanvas"
-                              ItemsSource="{Binding CurrentBoard.Items}"
-                              HorizontalAlignment="Left"
-                              VerticalAlignment="Top">
+                        <ItemsControl.RenderTransform>
+                            <TransformGroup>
+                                <ScaleTransform ScaleX="{Binding ZoomLevel}" ScaleY="{Binding ZoomLevel}"/>
+                                <TranslateTransform X="{Binding PanX}" Y="{Binding PanY}"/>
+                            </TransformGroup>
+                        </ItemsControl.RenderTransform>
 
-                    <ItemsControl.RenderTransform>
-                        <ScaleTransform ScaleX="{Binding ZoomLevel}" ScaleY="{Binding ZoomLevel}"/>
-                    </ItemsControl.RenderTransform>
+                        <!-- Use a Canvas so items can be positioned freely via X/Y -->
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <Canvas Background="{StaticResource BackgroundBrush}"/>
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
 
-                    <!-- Use a Canvas so items can be positioned freely via X/Y -->
-                    <ItemsControl.ItemsPanel>
-                        <ItemsPanelTemplate>
-                            <Canvas Background="#FAFAFA"/>
-                        </ItemsPanelTemplate>
-                    </ItemsControl.ItemsPanel>
+                        <!-- Positions each item's container using its bound X/Y -->
+                        <!-- Positions each item using X/Y, and enables drag via the attached behavior -->
+                        <ItemsControl.ItemContainerStyle>
+                            <Style TargetType="ContentPresenter">
+                                <Setter Property="Canvas.Left" Value="{Binding X}"/>
+                                <Setter Property="Canvas.Top" Value="{Binding Y}"/>
+                                <Setter Property="behaviors:DraggableBehavior.IsDraggable" Value="True"/>
+                            </Style>
+                        </ItemsControl.ItemContainerStyle>
 
-                    <!-- Positions each item's container using its bound X/Y -->
-                    <!-- Positions each item using X/Y, and enables drag via the attached behavior -->
-                    <ItemsControl.ItemContainerStyle>
-                        <Style TargetType="ContentPresenter">
-                            <Setter Property="Canvas.Left" Value="{Binding X}"/>
-                            <Setter Property="Canvas.Top" Value="{Binding Y}"/>
-                            <Setter Property="behaviors:DraggableBehavior.IsDraggable" Value="True"/>
-                        </Style>
-                    </ItemsControl.ItemContainerStyle>
+                        <!-- Picks the correct visual based on the ViewModel's runtime type -->
+                        <ItemsControl.Resources>
+                            <DataTemplate DataType="{x:Type vm:NoteItemViewModel}">
+                                <Grid Width="{Binding Width}" Height="{Binding Height}">
+                                    <Border x:Name="NoteBorder"
+                                            Background="{StaticResource NoteBrush}"
+                                            BorderThickness="1.5"
+                                            BorderBrush="{StaticResource NoteBorderBrush}"
+                                            CornerRadius="6"
+                                            Padding="10"
+                                            Effect="{StaticResource SoftShadow}">           
+                                        <Grid>
+                                            <!-- Display mode: read-only, lets clicks fall through to selection/drag -->
+                                            <TextBlock x:Name="DisplayText"
+                                                       Text="{Binding Content}"
+                                                       TextWrapping="Wrap"
+                                                       Style="{StaticResource BodyText}"/>      
 
-                    <!-- Picks the correct visual based on the ViewModel's runtime type -->
-                    <ItemsControl.Resources>
-                        <DataTemplate DataType="{x:Type vm:NoteItemViewModel}">
-                            <Grid Width="{Binding Width}" Height="{Binding Height}">
-                                <Border x:Name="NoteBorder"
-                                        Background="#FFF9C4"
-                                        BorderThickness="2"
-                                        BorderBrush="Transparent"
-                                        Padding="10">
-                                     <TextBox Text="{Binding Content}" TextWrapping="Wrap"
-                                             BorderThickness="0" Background="Transparent"/>
-                                </Border>
-
-                                <Thumb Width="12" Height="12"
-                                       HorizontalAlignment="Right" VerticalAlignment="Bottom"
-                                       Cursor="SizeNWSE" Background="Gray"
-                                       DragDelta="ResizeThumb_DragDelta"/>
-                            </Grid>
-
-                            <!-- Highlights the border blue when this note is selected -->
-                            <DataTemplate.Triggers>
-                                <DataTrigger Binding="{Binding IsSelected}" Value="True">
-                                    <Setter TargetName="NoteBorder" Property="BorderBrush" Value="#2196F3"/>
-                                </DataTrigger>
-                            </DataTemplate.Triggers>
-                        </DataTemplate>
-
-                        <!-- Visual for a Board sitting on a parent canvas — looks like a folder tile -->
-                        <DataTemplate DataType="{x:Type vm:BoardViewModel}">
-                            <Border x:Name="BoardBorder"
-                                    BorderThickness="2"
-                                    BorderBrush="Transparent"
-                                    CornerRadius="8">               
-                                <StackPanel Width="120" Cursor="Hand">
-                                    <Border Background="#B39DDB" CornerRadius="8" Height="70">
-                                        <TextBlock Text="📁" FontSize="28"
-                                                   HorizontalAlignment="Center"
-                                                   VerticalAlignment="Center"/>
+                                            <!-- Edit mode: real TextBox, only shown while IsEditing is true -->
+                                            <TextBox x:Name="EditBox"
+                                                     Text="{Binding Content, UpdateSourceTrigger=PropertyChanged}"
+                                                     TextWrapping="Wrap"
+                                                     BorderThickness="0" Background="Transparent"
+                                                     FontFamily="{StaticResource PrimaryFont}" FontSize="13"
+                                                     Visibility="Collapsed"
+                                                     LostFocus="NoteEditBox_LostFocus"
+                                                     IsVisibleChanged="NoteEditBox_IsVisibleChanged"
+                                                     PreviewKeyDown="NoteEditBox_PreviewKeyDown"/>
+                                        </Grid>
                                     </Border>
 
-                                    <TextBlock Text="{Binding Title}"
-                                               FontWeight="Bold"
-                                               HorizontalAlignment="Center"
-                                               Margin="0,4,0,0"/>
+                                    <Thumb Width="12" Height="12"
+                                           HorizontalAlignment="Right" VerticalAlignment="Bottom"
+                                           Cursor="SizeNWSE" Background="Gray"
+                                           DragDelta="ResizeThumb_DragDelta"/>          
+                                </Grid>
 
-                                    <TextBlock Text="{Binding Items.Count, StringFormat={}{0} items}"
-                                               FontSize="11" Foreground="Gray"
-                                               HorizontalAlignment="Center"/>
-                                </StackPanel>
-                            </Border>
+                                <DataTemplate.Triggers>
+                                    <DataTrigger Binding="{Binding IsSelected}" Value="True">
+                                        <Setter TargetName="NoteBorder" Property="BorderBrush" Value="{StaticResource AccentBrush}"/>
+                                    </DataTrigger>
 
-                            <!-- Highlights the border blue when this board is selected -->
-                            <DataTemplate.Triggers>
-                                <DataTrigger Binding="{Binding IsSelected}" Value="True">
-                                    <Setter TargetName="BoardBorder" Property="BorderBrush" Value="#2196F3"/>
-                                </DataTrigger>
-                            </DataTemplate.Triggers>
-                        </DataTemplate>
+                                    <!-- Swaps to edit mode: hide the display text, show the real TextBox -->
+                                    <DataTrigger Binding="{Binding IsEditing}" Value="True">
+                                        <Setter TargetName="DisplayText" Property="Visibility" Value="Collapsed"/>
+                                        <Setter TargetName="EditBox" Property="Visibility" Value="Visible"/>
+                                    </DataTrigger>
+                                </DataTemplate.Triggers>
+                            </DataTemplate>
 
-                        <!-- Visual for an ImageItem — displays the image at its FilePath -->
-                        <DataTemplate DataType="{x:Type vm:ImageItemViewModel}">
-                            <Grid Width="{Binding Width}" Height="{Binding Height}">
-                                <Border x:Name="ImageBorder"
+                            <!-- Visual for a Board sitting on a parent canvas — looks like a folder tile -->
+                            <DataTemplate DataType="{x:Type vm:BoardViewModel}">
+                                <Border x:Name="BoardBorder"
                                         BorderThickness="2"
                                         BorderBrush="Transparent"
-                                        Background="White">         
-                                    <Image Source="{Binding FilePath}" Stretch="Uniform"/>
+                                        CornerRadius="10"
+                                        Effect="{StaticResource SoftShadow}">
+                                    <StackPanel Width="120" Cursor="Hand">
+                                        <Border Background="{StaticResource BoardAccentBrush}" CornerRadius="10" Height="70">
+                                            <TextBlock Text="📁" FontSize="26" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                                 </Border>
 
-                                <!-- Resize handle, identical pattern to the Note template -->
-                                <Thumb Width="12" Height="12"
-                                       HorizontalAlignment="Right" VerticalAlignment="Bottom"
-                                       Cursor="SizeNWSE" Background="Gray"
-                                       DragDelta="ResizeThumb_DragDelta"/>                  
-                            </Grid>
+                                        <!-- Title area: display TextBlock and edit TextBox occupy the same spot -->
+                                        <Grid Margin="0,6,0,0">
+                                            <TextBlock x:Name="TitleDisplay"
+                                                       Text="{Binding Title}"
+                                                       Style="{StaticResource BodyText}"
+                                                       FontWeight="SemiBold"
+                                                       HorizontalAlignment="Center"
+                                                       TextAlignment="Center"
+                                                       MouseLeftButtonDown="BoardTitle_MouseLeftButtonDown"/>
 
-                            <DataTemplate.Triggers>
-                                <DataTrigger Binding="{Binding IsSelected}" Value="True">
-                                    <Setter TargetName="ImageBorder" Property="BorderBrush" Value="#2196F3"/>
-                                </DataTrigger>
-                            </DataTemplate.Triggers>
-                        </DataTemplate>
-                    </ItemsControl.Resources>
-                </ItemsControl>
+                                            <TextBox x:Name="TitleEditBox"
+                                                     Text="{Binding Title, UpdateSourceTrigger=PropertyChanged}"
+                                                     FontFamily="{StaticResource PrimaryFont}" FontSize="13" FontWeight="SemiBold"
+                                                     TextAlignment="Center" BorderThickness="0" Background="Transparent"
+                                                     Visibility="Collapsed"
+                                                     Loaded="BoardTitleEditBox_Loaded"
+                                                     IsVisibleChanged="BoardTitleEditBox_IsVisibleChanged"
+                                                     PreviewKeyDown="BoardTitleEditBox_PreviewKeyDown"/>
+                                        </Grid>
+
+                                        <TextBlock Text="{Binding Items.Count, StringFormat={}{0} items}"
+                                                   Style="{StaticResource CaptionText}"
+                                                   HorizontalAlignment="Center"/>
+                                    </StackPanel>
+                                </Border>
+
+                                <DataTemplate.Triggers>
+                                    <DataTrigger Binding="{Binding IsSelected}" Value="True">
+                                        <Setter TargetName="BoardBorder" Property="BorderBrush" Value="{StaticResource AccentBrush}"/>
+                                    </DataTrigger>
+
+                                    <!-- Swaps to edit mode: hide the display title, show the real TextBox -->
+                                    <DataTrigger Binding="{Binding IsEditingTitle}" Value="True">
+                                        <Setter TargetName="TitleDisplay" Property="Visibility" Value="Collapsed"/>
+                                        <Setter TargetName="TitleEditBox" Property="Visibility" Value="Visible"/>
+                                    </DataTrigger>
+                                </DataTemplate.Triggers>
+                            </DataTemplate>
+
+                            <!-- Visual for an ImageItem — displays the image at its FilePath -->
+                            <DataTemplate DataType="{x:Type vm:ImageItemViewModel}">
+                                <Grid Width="{Binding Width}" Height="{Binding Height}">
+                                    <Border x:Name="ImageBorder"
+                                            BorderThickness="2"
+                                            BorderBrush="Transparent"
+                                            CornerRadius="6"
+                                            Background="White"
+                                            Effect="{StaticResource SoftShadow}">
+                                        <Image Source="{Binding FilePath}" Stretch="Uniform"/>
+                                    </Border>
+
+                                    <!-- Resize handle, identical pattern to the Note template -->
+                                    <Thumb Width="12" Height="12"
+                                           HorizontalAlignment="Right" VerticalAlignment="Bottom"
+                                           Cursor="SizeNWSE" Background="Gray"
+                                           DragDelta="ResizeThumb_DragDelta"/>                  
+                                </Grid>
+
+                                <DataTemplate.Triggers>
+                                    <DataTrigger Binding="{Binding IsSelected}" Value="True">
+                                        <Setter TargetName="ImageBorder" Property="BorderBrush" Value="{StaticResource AccentBrush}"/>
+                                    </DataTrigger>
+                                </DataTemplate.Triggers>
+                            </DataTemplate>
+                        </ItemsControl.Resources>
+                    </ItemsControl>
+
+                    <Rectangle x:Name="SelectionBox"
+                               Stroke="{StaticResource AccentBrush}"
+                               StrokeThickness="1"
+                               Fill="#332196F3"
+                               Visibility="Collapsed"
+                               IsHitTestVisible="False"
+                               HorizontalAlignment="Left"
+                               VerticalAlignment="Top"/>
+
+                </Grid>
+                
+                
+            </Border>
+            <!-- Sidebar: collapsed to icon-only width by default, expands on hover, renders above the canvas (Panel.ZIndex) so it never shifts canvas content -->
+            <Border x:Name="Sidebar"
+                    Background="{StaticResource SidebarBrush}"
+                    HorizontalAlignment="Left"
+                    Width="60"
+                    Panel.ZIndex="10"
+                    Effect="{StaticResource SoftShadow}">       
+
+                <!-- Animates the Border's width on hover — the actual "collapse/expand" motion -->
+                <Border.Triggers>
+                    <EventTrigger RoutedEvent="MouseEnter">
+                        <BeginStoryboard>
+                            <Storyboard>
+                                <DoubleAnimation Storyboard.TargetProperty="Width"
+                                                 To="180" Duration="0:0:0.15"/>
+                            </Storyboard>
+                        </BeginStoryboard>
+                    </EventTrigger>
+                    <EventTrigger RoutedEvent="MouseLeave">
+                        <BeginStoryboard>
+                            <Storyboard>
+                                <DoubleAnimation Storyboard.TargetProperty="Width"
+                                                 To="60" Duration="0:0:0.15"/>
+                            </Storyboard>
+                        </BeginStoryboard>
+                    </EventTrigger>
+                </Border.Triggers>
+
+                <StackPanel>
+                    <!-- Each button: icon always visible, label only visible while expanded -->
+                    <Button Command="{Binding AddNoteCommand}" Style="{StaticResource SidebarButtonStyle}" Focusable="False">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="📝" FontSize="16" Width="30" TextAlignment="Center"/>
+                            <TextBlock Text="Note" Style="{StaticResource BodyText}" VerticalAlignment="Center"
+                                       Visibility="{Binding IsMouseOver, ElementName=Sidebar, Converter={StaticResource BoolToVis}}"/>
+                        </StackPanel>
+                    </Button>
+
+                    <Button Command="{Binding AddBoardCommand}" Style="{StaticResource SidebarButtonStyle}" Focusable="False">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="📁" FontSize="16" Width="30" TextAlignment="Center"/>
+                            <TextBlock Text="Board" Style="{StaticResource BodyText}" VerticalAlignment="Center"
+                                       Visibility="{Binding IsMouseOver, ElementName=Sidebar, Converter={StaticResource BoolToVis}}"/>
+                        </StackPanel>
+                    </Button>
+                </StackPanel>
+            </Border>
+
+            <!-- Zoom percentage indicator — floats in the bottom-center of the canvas -->
+            <Border Background="{StaticResource SidebarBrush}"
+                    CornerRadius="6"
+                    Padding="10,5"
+                    Margin="0,0,16,16"
+                    HorizontalAlignment="Center"
+                    VerticalAlignment="Bottom"
+                    Effect="{StaticResource SoftShadow}"
+                    Panel.ZIndex="5">   
+                <TextBlock Text="{Binding ZoomDisplayText}" Style="{StaticResource CaptionText}"/>
             </Border>
 
         </Grid>

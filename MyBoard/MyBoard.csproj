@@ -9,7 +9,17 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <None Remove="Assets\closedHand.cur" />
+    <None Remove="Assets\openHand.cur" />
+  </ItemGroup>
+
+  <ItemGroup>
     <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Resource Include="Assets\closedHand.cur" />
+    <Resource Include="Assets\openHand.cur" />
   </ItemGroup>
 
 </Project>
