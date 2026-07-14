@@ -21,7 +21,7 @@
     <Grid x:Name="RootGrid"
           Focusable="True"
           PreviewMouseLeftButtonDown="RootGrid_PreviewMouseLeftButtonDown"
-          PreviewMouseLeftButtonUp="RootGrid_PreviewMouseLeftButtonUp">
+          MouseLeftButtonUp="RootGrid_PreviewMouseLeftButtonUp">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/> <!--breadcrumb-->
             <RowDefinition Height="Auto"/> <!--board title-->
@@ -54,10 +54,43 @@
             </ItemsControl>
         </DockPanel>
 
-        <!--Row 1: Current Board Title-->
-        <TextBlock Grid.Row="1" Text="{Binding CurrentBoard.Title}"
-                   Style="{StaticResource HeaderText}"
-                   HorizontalAlignment="Center" Margin="0,10"/>
+        <!-- Row 1: Undo/Redo (left) + Board Title (center) -->
+        <Grid Grid.Row="1" Margin="0,10">
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Left" Margin="16,0">
+                <Button Content="↶ Undo"
+                        Command="{Binding UndoCommand}"
+                        IsEnabled="{Binding UndoRedo.CanUndo}">     
+                    <Button.Style>
+                        <Style TargetType="Button" BasedOn="{StaticResource SidebarButtonStyle}">
+                            <Setter Property="Opacity" Value="1"/>
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding UndoRedo.CanUndo}" Value="False">
+                                    <Setter Property="Opacity" Value="0.35"/>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Button.Style>
+                </Button>
+
+                <Button Content="↷ Redo" 
+                        Command="{Binding RedoCommand}" 
+                        IsEnabled="{Binding UndoRedo.CanRedo}"
+                        Margin="8,0,0,0">
+                    <Button.Style>
+                        <Style TargetType="Button" BasedOn="{StaticResource SidebarButtonStyle}">
+                            <Setter Property="Opacity" Value="1"/>
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding UndoRedo.CanRedo}" Value="False">
+                                    <Setter Property="Opacity" Value="0.35"/>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Button.Style>
+                </Button>
+            </StackPanel>
+
+            <TextBlock Text="{Binding CurrentBoard.Title}" Style="{StaticResource HeaderText}" HorizontalAlignment="Center"/>
+        </Grid>
 
         <!-- Thin separator between the title bar and the canvas -->
         <Border Grid.Row="1" VerticalAlignment="Bottom"
@@ -81,6 +114,16 @@
                             PreviewMouseLeftButtonDown="CanvasViewport_PreviewMouseLeftButtonDown"
                             MouseMove="CanvasViewport_MouseMove"
                             MouseLeftButtonUp="CanvasViewport_MouseLeftButtonUp">
+
+                <Border.ContextMenu>
+                    <ContextMenu>
+                        <MenuItem Header="Undo" Command="{Binding DataContext.UndoCommand, RelativeSource={RelativeSource AncestorType=Window}}" InputGestureText="Ctrl+Z"/>
+                        <MenuItem Header="Redo" Command="{Binding DataContext.RedoCommand, RelativeSource={RelativeSource AncestorType=Window}}" InputGestureText="Ctrl+Y"/>
+                        <Separator/>
+                        <MenuItem Header="Paste" Click="MenuItem_PasteCanvas_Click" InputGestureText="Ctrl+V"/>
+                    </ContextMenu>
+                </Border.ContextMenu>
+
                 <Grid>
                     <ItemsControl x:Name="BoardCanvas"
                                   ItemsSource="{Binding CurrentBoard.Items}"
@@ -121,7 +164,18 @@
                                             BorderBrush="{StaticResource NoteBorderBrush}"
                                             CornerRadius="6"
                                             Padding="10"
-                                            Effect="{StaticResource SoftShadow}">           
+                                            Effect="{StaticResource SoftShadow}">
+
+                                        <Border.ContextMenu>
+                                            <ContextMenu>
+                                                <MenuItem Header="Cut" Click="MenuItem_Cut_Click" InputGestureText="Ctrl+X"/>
+                                                <MenuItem Header="Copy" Click="MenuItem_Copy_Click" InputGestureText="Ctrl+C"/>
+                                                <MenuItem Header="Duplicate" Click="MenuItem_Duplicate_Click" InputGestureText="Ctrl+D"/>
+                                                <Separator/>
+                                                <MenuItem Header="Delete" Click="MenuItem_Delete_Click" InputGestureText="Del"/>
+                                            </ContextMenu>
+                                        </Border.ContextMenu>
+
                                         <Grid>
                                             <!-- Display mode: read-only, lets clicks fall through to selection/drag -->
                                             <TextBlock x:Name="DisplayText"
@@ -168,6 +222,19 @@
                                         BorderBrush="Transparent"
                                         CornerRadius="10"
                                         Effect="{StaticResource SoftShadow}">
+
+                                    <Border.ContextMenu>
+                                        <ContextMenu>
+                                            <MenuItem Header="Rename" Click="MenuItem_Rename_Click" InputGestureText="F2"/>
+                                            <Separator/>
+                                            <MenuItem Header="Cut" Click="MenuItem_Cut_Click" InputGestureText="Ctrl+X"/>
+                                            <MenuItem Header="Copy" Click="MenuItem_Copy_Click" InputGestureText="Ctrl+C"/>
+                                            <MenuItem Header="Duplicate" Click="MenuItem_Duplicate_Click" InputGestureText="Ctrl+D"/>
+                                            <Separator/>
+                                            <MenuItem Header="Delete" Click="MenuItem_Delete_Click" InputGestureText="Del"/>
+                                        </ContextMenu>
+                                    </Border.ContextMenu>
+
                                     <StackPanel Width="120" Cursor="Hand">
                                         <Border Background="{StaticResource BoardAccentBrush}" CornerRadius="10" Height="70">
                                             <TextBlock Text="📁" FontSize="26" HorizontalAlignment="Center" VerticalAlignment="Center"/>
@@ -222,7 +289,19 @@
                                             Background="White"
                                             Effect="{StaticResource SoftShadow}">
                                         <Image Source="{Binding FilePath}" Stretch="Uniform"/>
+
+                                        <Border.ContextMenu>
+                                            <ContextMenu>
+                                                <MenuItem Header="Cut" Click="MenuItem_Cut_Click" InputGestureText="Ctrl+X"/>
+                                                <MenuItem Header="Copy" Click="MenuItem_Copy_Click" InputGestureText="Ctrl+C"/>
+                                                <MenuItem Header="Duplicate" Click="MenuItem_Duplicate_Click" InputGestureText="Ctrl+D"/>
+                                                <Separator/>
+                                                <MenuItem Header="Delete" Click="MenuItem_Delete_Click" InputGestureText="Del"/>
+                                            </ContextMenu>
+                                        </Border.ContextMenu>
+                                        
                                     </Border>
+                                    
 
                                     <!-- Resize handle, identical pattern to the Note template -->
                                     <Thumb Width="12" Height="12"

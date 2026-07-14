@@ -1,5 +1,6 @@
 ﻿using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using MyBoard.Commands;
 using MyBoard.Model;
 using MyBoard.Services;
 using System;
@@ -33,17 +34,29 @@ namespace MyBoard.ViewModel
             ZoomDisplayText = $"{value * 100:0}%";
         }
 
+
         //The navigation trail
         public ObservableCollection<BoardViewModel> BreadcrumbTrail { get; } = new();
 
+
+        //Undo and Redo
+        public UndoRedoManager UndoRedo { get; } = new();
+
         public MainViewModel()
         {
-            // Try loading a previously saved board tree; fall back to a fresh "Home" board only if this is the first run (no save file yet)
             Board homeBoard = BoardSaveService.Load() ?? new Board { Title = "Home" };
-
-            currentBoard = new BoardViewModel(homeBoard);
-            BreadcrumbTrail.Add(currentBoard); // Start the trail at Home
+            currentBoard = new BoardViewModel(homeBoard, UndoRedo); // pass it in here
+            BreadcrumbTrail.Add(currentBoard);
         }
+
+
+        //Undo and redo commands
+        [RelayCommand]
+        private void Undo() => UndoRedo.Undo();
+
+        [RelayCommand]
+        private void Redo() => UndoRedo.Redo();
+
 
         // Called when a board tile is clicked — moves navigation one level deeper
         [RelayCommand]
@@ -52,6 +65,7 @@ namespace MyBoard.ViewModel
             CurrentBoard = board;
             BreadcrumbTrail.Add(board);
         }
+
 
         // Called when a breadcrumb item is clicked — jumps back to that level, discarding everything deeper in the trail
         [RelayCommand]
@@ -67,6 +81,7 @@ namespace MyBoard.ViewModel
             CurrentBoard = board;
         }
 
+
         // Manually triggered save (e.g. Ctrl+S) — saves from the root Home board downward, regardless of which nested board is currently being viewed
         [RelayCommand]
         private void SaveBoard()
@@ -75,12 +90,14 @@ namespace MyBoard.ViewModel
             BoardSaveService.Save(rootBoard);
         }
 
+
         // Adds a new note to whichever board is currently displayed
         [RelayCommand]
         private void AddNote()
         {
             CurrentBoard.AddNote();
         }
+
 
         // Adds a new sub-board to whichever board is currently displayed
         [RelayCommand]

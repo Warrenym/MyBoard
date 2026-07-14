@@ -1,9 +1,12 @@
 ﻿using MyBoard.ViewModel;
 using System;
 using System.Collections.Generic;
-using System.Text;
+using System.Collections.ObjectModel;
 using System.Runtime.InteropServices;
+using System.Text;
+using System.Text.RegularExpressions;
 using System.Windows;
+using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 
 namespace MyBoard.Behaviors
@@ -23,8 +26,12 @@ namespace MyBoard.Behaviors
                 "IsDraggable", typeof(bool), typeof(DraggableBehavior),
                 new PropertyMetadata(false, OnIsDraggableChanged));
 
+
+        // Captures each selected item's position at the START of a drag
+        private static List<(IPositionable item, double startX, double startY)> dragStartPositions = new();
         public static void SetIsDraggable(UIElement element, bool value) => element.SetValue(IsDraggableProperty, value);
         public static bool GetIsDraggable(UIElement element) =>(bool)element.GetValue(IsDraggableProperty);
+
 
         private static void OnIsDraggableChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
         {
@@ -35,14 +42,17 @@ namespace MyBoard.Behaviors
                 element.MouseLeftButtonDown += Element_MouseLeftButtonDown;
                 element.MouseMove += Element_MouseMove;
                 element.MouseLeftButtonUp += Element_MouseLeftButtonUp;
+                element.PreviewMouseRightButtonDown += Element_PreviewMouseRightButtonDown; // new
             }
             else
             {
                 element.MouseLeftButtonDown -= Element_MouseLeftButtonDown;
                 element.MouseMove -= Element_MouseMove;
                 element.MouseLeftButtonUp -= Element_MouseLeftButtonUp;
+                element.PreviewMouseRightButtonDown -= Element_PreviewMouseRightButtonDown; // new
             }
         }
+
 
         private static void Element_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
         {
@@ -63,7 +73,11 @@ namespace MyBoard.Behaviors
             lastClickTime = now;
             lastClickedItem = clickedItem;
 
-            if (Window.GetWindow(element)?.DataContext is MainViewModel mainViewModel)
+
+
+            var mainViewModel = Window.GetWindow(element)?.DataContext as MainViewModel;
+
+            if (mainViewModel != null)
             {
                 activeMainViewModel = mainViewModel;
                 var board = mainViewModel.CurrentBoard;
@@ -85,10 +99,23 @@ namespace MyBoard.Behaviors
                     return;
                 }
 
-                // If this item is already part of a multi-selection, keep the whole selection intact instead of collapsing to just this one — that's what allows the drag below to move every selected item together.
                 bool alreadyInSelection = board.SelectedItems.Contains(clickedItem);
                 if (!alreadyInSelection)
                     board.SelectItem(clickedItem);
+            }
+
+            // Capture starting positions for undo, now that mainViewModel is accessible here too (previously out of scope at this point)
+            dragStartPositions.Clear();
+            if (mainViewModel != null)
+            {
+                var itemsBeingDragged = (mainViewModel.CurrentBoard.SelectedItems.Count > 1 &&
+                                          mainViewModel.CurrentBoard.SelectedItems.Contains(clickedItem))
+                    ? mainViewModel.CurrentBoard.SelectedItems
+                    : new ObservableCollection<object> { clickedItem };
+
+                foreach (var item in itemsBeingDragged)
+                    if (item is IPositionable positionable)
+                        dragStartPositions.Add((positionable, positionable.X, positionable.Y));
             }
 
             isDragging = true;
@@ -96,6 +123,7 @@ namespace MyBoard.Behaviors
             element.CaptureMouse();
             e.Handled = true;
         }
+
 
         private static void Element_MouseMove(object sender, MouseEventArgs e)
         {
@@ -132,12 +160,29 @@ namespace MyBoard.Behaviors
             lastMousePosition = currentPosition;
         }
 
+
         private static void Element_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
         {
             isDragging = false;
-            ((FrameworkElement)sender).ReleaseMouseCapture();
+            var element = (FrameworkElement)sender;
+            element.ReleaseMouseCapture();
+
+            if (dragStartPositions.Count > 0 &&
+                Window.GetWindow(element)?.DataContext is ViewModel.MainViewModel mainViewModel)
+            {
+                var moves = dragStartPositions
+                    .Where(d => d.item.X != d.startX || d.item.Y != d.startY) // skip if it never actually moved
+                    .Select(d => (d.item, d.startX, d.startY, d.item.X, d.item.Y))
+                    .ToList();
+
+                if (moves.Count > 0)
+                    mainViewModel.UndoRedo.Record(new Commands.MoveItemsCommand(moves));
+            }
+
+            dragStartPositions.Clear();
         }
 
+        //Double clicking
         [System.Runtime.InteropServices.DllImport("user32.dll")]
         private static extern int GetDoubleClickTime();
 
@@ -149,5 +194,21 @@ namespace MyBoard.Behaviors
 
             return current as UIElement ?? element;
         }
+
+
+        // Right-clicking selects the item BEFORE the context menu opens
+        private static void Element_PreviewMouseRightButtonDown(object sender, MouseButtonEventArgs e)
+        {
+            var element = (FrameworkElement)sender;
+            var clickedItem = element.DataContext;
+
+            if (Window.GetWindow(element)?.DataContext is ViewModel.MainViewModel mainViewModel)
+            {
+                var board = mainViewModel.CurrentBoard;
+                if (!board.SelectedItems.Contains(clickedItem))
+                    board.SelectItem(clickedItem);
+            }
+        }
     }
+
 }

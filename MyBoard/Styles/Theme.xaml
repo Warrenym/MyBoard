@@ -7,7 +7,7 @@
 
     <Color x:Key="BackgroundColor">#FAFAF8</Color>
     <Color x:Key="SidebarColor">#FFFFFF</Color>
-    <Color x:Key="NoteColor">#FFF6D8</Color>
+    <Color x:Key="NoteColor">#FEFAE0</Color>
     <Color x:Key="NoteBorderColor">#F2E4A8</Color>
     <Color x:Key="BoardAccentColor">#C9B8F0</Color>
     <Color x:Key="AccentColor">#6C9BCF</Color>

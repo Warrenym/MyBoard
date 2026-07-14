@@ -1,9 +1,12 @@
 ﻿using CommunityToolkit.Mvvm.ComponentModel;
+using MyBoard.Commands;
 using MyBoard.Model;
+using MyBoard.Services;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Text;
+using System.Windows;
 
 namespace MyBoard.ViewModel
 {
@@ -36,70 +39,91 @@ namespace MyBoard.ViewModel
 
         public ObservableCollection<object> Items { get; } = new();
 
-        public BoardViewModel(Board model)
-        {
-            Model = model;
-            x = model.X;
-            y = model.Y;
-            title = model.Title;
+        //Undo and Redo
+        private readonly UndoRedoManager undoRedo; // shared across the whole board tree
 
-            foreach (var item in model.Items)
-                Items.Add(WrapModel(item));
-        }
+
+        public BoardViewModel(Board model, UndoRedoManager undoRedo)
+{
+    this.undoRedo = undoRedo;
+    Model = model; // this line was missing entirely
+    x = model.X;
+    y = model.Y;
+    title = model.Title;
+
+    foreach (var item in model.Items)
+        Items.Add(WrapModel(item));
+}
+
 
         private object WrapModel(ICanvasItem item) => item switch
         {
             NoteItem note => new NoteItemViewModel(note),
             ImageItem image => new ImageItemViewModel(image),
-            Board board => new BoardViewModel(board),
-            _ => throw new System.NotSupportedException($"Unknown item type: {item.GetType()}")
+            Board board => new BoardViewModel(board, undoRedo), // forward the same instance
+            _ => throw new NotSupportedException($"Unknown item type: {item.GetType()}")
         };
+
 
         partial void OnXChanged(double value) => Model.X = value;
         partial void OnYChanged(double value) => Model.Y = value;
         partial void OnTitleChanged(string value) => Model.Title = value;
 
-        // Creates a new NoteItem, adds it to both the Model and the display collection,
-        // and places it at a default position so it doesn't overlap existing items.
+        // Creates a new NoteItem, adds it to both the Model and the display collection, and places it at a default position so it doesn't overlap existing items.
         public void AddNote()
         {
             var note = new NoteItem { Content = "New note", X = 100, Y = 100 };
-            Model.Items.Add(note);
-            Items.Add(new NoteItemViewModel(note));
+            var vm = new NoteItemViewModel(note);
+            undoRedo.Do(new AddItemCommand(Model.Items, Items, note, vm));
         }
+
 
         // Creates a new sub-Board, adds it the same way notes are added.
         public BoardViewModel AddBoard()
         {
             var board = new Board { Title = "Unnamed Board", X = 100, Y = 250, ParentBoardId = Model.Id };
-            Model.Items.Add(board);
-
-            var boardViewModel = new BoardViewModel(board);
-            Items.Add(boardViewModel);
-            boardViewModel.IsEditingTitle = true;
-
-            return boardViewModel;
+            var vm = new BoardViewModel(board, undoRedo);
+            undoRedo.Do(new AddItemCommand(Model.Items, Items, board, vm));
+            vm.IsEditingTitle = true;
+            return vm;
         }
+
+
+        // Call this instead of directly setting IsEditingTitle = true
+        private string titleBeforeEdit = "";
+        public void BeginEditingTitle()
+        {
+            titleBeforeEdit = Title;
+            IsEditingTitle = true;
+        }
+
 
         // Exits title-editing mode. If the user left it blank, defaults to "Unnamed Board"
         public void CommitTitle()
         {
             if (string.IsNullOrWhiteSpace(Title))
                 Title = "Unnamed Board";
+
+            if (Title != titleBeforeEdit)
+                undoRedo.Record(new RenameCommand(this, titleBeforeEdit, Title));
+
             IsEditingTitle = false;
         }
+
 
         // Creates a new ImageItem at the given position — used by drag-and-drop.
         public void AddImage(string filePath, double x, double y)
         {
             var image = new ImageItem { FilePath = filePath, X = x, Y = y };
-            Model.Items.Add(image);
-            Items.Add(new ImageItemViewModel(image));
+            var vm = new ImageItemViewModel(image);
+            undoRedo.Do(new AddItemCommand(Model.Items, Items, image, vm));
         }
+
 
         // Tracks every currently selected item on this board (supports multi-select).
         // Kept in sync with each item's own IsSelected flag, which drives the highlight border.
         public ObservableCollection<object> SelectedItems { get; } = new();
+
 
         // Selects a single item, replacing any existing selection.
         // Used for a normal single click.
@@ -114,6 +138,7 @@ namespace MyBoard.ViewModel
 
             SelectedItems.Add(item);
         }
+
 
         // Selects a whole set of items at once, replacing any existing selection.
         // Used by the drag-box multi-select.
@@ -131,6 +156,7 @@ namespace MyBoard.ViewModel
             }
         }
 
+
         // Deselects everything — called when clicking empty canvas space
         public void ClearSelection()
         {
@@ -139,17 +165,89 @@ namespace MyBoard.ViewModel
             SelectedItems.Clear();
         }
 
+
         // Removes every currently selected item from both the display collection
         // and the underlying Model — now handles multiple items at once
         public void DeleteSelectedItems()
         {
-            foreach (var item in SelectedItems.ToList()) // ToList() avoids mutating while iterating
-            {
-                if (item is ICanvasItemViewModel canvasItemVm)
-                    Model.Items.Remove(canvasItemVm.Model);
-                Items.Remove(item);
-            }
+            var removed = SelectedItems
+                        .OfType<ICanvasItemViewModel>()
+                        .Select(vm => (vm.Model, (object)vm))
+                        .ToList();
+
+            if (removed.Count > 0)
+                undoRedo.Do(new DeleteItemsCommand(Model.Items, Items, removed));
+
             SelectedItems.Clear();
+        }
+
+
+        // Copies the current selection into the app clipboard (doesn't remove anything)
+        public void CopySelectedItems()
+        {
+            var models = SelectedItems.OfType<ICanvasItemViewModel>().Select(vm => vm.Model);
+            ClipboardService.SetCopy(models);
+        }
+
+        // Copies the current selection, then removes it from this board — the "move" half of cut/paste
+        public void CutSelectedItems()
+        {
+            var models = SelectedItems.OfType<ICanvasItemViewModel>().Select(vm => vm.Model).ToList();
+            ClipboardService.SetCut(models);
+            DeleteSelectedItems();
+        }
+
+
+        // Pastes whatever is in the clipboard at the given canvas position,
+        // cascading each subsequent item slightly so a multi-item paste doesn't land as one exact overlapping stack
+        public void PasteClipboard(double x, double y)
+        {
+            if (!ClipboardService.HasContent) return;
+
+            // Anchor point = top-left corner of the clipboard group's bounding box based on the items' ORIGINAL positions (before any paste offset)
+            double anchorX = ClipboardService.Items.Min(item => item.X);
+            double anchorY = ClipboardService.Items.Min(item => item.Y);
+
+            // One shared delta for the whole group — this is what preserves relative layout, since every item moves by the exact same amount
+            double offsetX = (x - anchorX) + 20;
+            double offsetY = (y - anchorY) + 20;
+
+            var pasted = new List<object>();
+
+            foreach (var clipboardModel in ClipboardService.Items)
+            {
+                var clone = CanvasItemClonerService.Clone(clipboardModel);
+                clone.X += offsetX;
+                clone.Y += offsetY;
+
+                var vm = WrapModel(clone);
+                undoRedo.Do(new AddItemCommand(Model.Items, Items, clone, vm));
+                pasted.Add(vm);
+            }   
+
+            SelectItems(pasted);
+
+            if (ClipboardService.IsCutOperation)
+                ClipboardService.Items.Clear();
+        }
+
+        // Duplicates the current selection in place, offset slightly so the copy is visually distinguishable from the original
+        public void DuplicateSelectedItems()
+        {
+            var duplicates = new List<object>();
+
+            foreach (var item in SelectedItems.OfType<ICanvasItemViewModel>().ToList())
+            {
+                var clone = CanvasItemClonerService.Clone(item.Model);
+                clone.X += 20;
+                clone.Y += 20;
+
+                var vm = WrapModel(clone);
+                undoRedo.Do(new AddItemCommand(Model.Items, Items, clone, vm));
+                duplicates.Add(vm);
+            }
+
+            SelectItems(duplicates);
         }
 
 

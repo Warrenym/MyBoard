@@ -27,13 +27,12 @@ namespace MyBoard
             PreviewKeyDown += MainWindow_PreviewKeyDown_Pan;
             PreviewKeyUp += MainWindow_PreviewKeyUp_Pan;
             Closing += MainWindow_Closing;
-
-
         }
 
         private bool isSelecting;
         private bool didDrag;
         private Point selectionStartPoint;
+
 
         // Called continuously while something is dragged over the canvas — decides whether to show the "can drop here" cursor
         private void BoardCanvas_DragEnter(object sender, DragEventArgs e)
@@ -96,6 +95,7 @@ namespace MyBoard
             }
         }
 
+
         // Auto-focuses the title TextBox the moment it appears, and selects all text so typing immediately replaces it (matches the Note editing pattern)
         private void BoardTitleEditBox_Loaded(object sender, RoutedEventArgs e)
         {
@@ -113,6 +113,7 @@ namespace MyBoard
             }), System.Windows.Threading.DispatcherPriority.Input);
         }
 
+
         // Handles focus for RE-entering edit mode (e.g. double-click rename)
         private void BoardTitleEditBox_IsVisibleChanged(object sender, DependencyPropertyChangedEventArgs e)
         {
@@ -126,6 +127,7 @@ namespace MyBoard
                 textBox.SelectAll();
             }), System.Windows.Threading.DispatcherPriority.Input);
         }
+
 
         // Enter or Escape both commit the title (Escape doesn't cancel/revert here, since an empty board name isn't a meaningful "undo" state to return to)
         private void BoardTitleEditBox_PreviewKeyDown(object sender, KeyEventArgs e)
@@ -153,22 +155,23 @@ namespace MyBoard
             }
         }
 
+
         // Double-clicking the title text renames the board; single-clicking it still selects/drags normally by letting the click bubble up unhandled
         private void BoardTitle_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
         {
             if (sender is not FrameworkElement element || element.DataContext is not ViewModel.BoardViewModel board)
                 return;
 
-            if (e.ClickCount == 2) // WPF tracks double-click count natively — no manual timing needed here
+            if (e.ClickCount == 2)
             {
                 if (Window.GetWindow(element)?.DataContext is ViewModel.MainViewModel mainViewModel)
                     mainViewModel.CurrentBoard.SelectItem(board);
 
-                board.IsEditingTitle = true;
-                e.Handled = true; // Stops this from also bubbling up to the tile's open/select logic
+                board.BeginEditingTitle(); 
+                e.Handled = true;
             }
-            // Single click: intentionally NOT handled, so it bubbles up to the tile  container and triggers normal selection via DraggableBehavior
         }
+
 
         private static bool IsImageFile(string path)
         {
@@ -198,6 +201,7 @@ namespace MyBoard
 
             return null;
         }
+
 
         // Zooms in/out anchored at the mouse cursor:
         // The canvas point currently under the mouse stays under the mouse after the zoom level changes, by solving for the pan offset that keeps that point fixed on screen.
@@ -232,6 +236,7 @@ namespace MyBoard
             e.Handled = true;
         }
 
+
         // Shared handler for both Note and Image resize thumbs.
         // Thumb.DragDelta already reports values in the item's local coordinate space, automatically accounting for the canvas's zoom transform — no manual scaling needed
         private void ResizeThumb_DragDelta(object sender, DragDeltaEventArgs e)
@@ -241,41 +246,6 @@ namespace MyBoard
 
             resizable.Width = Math.Max(60, resizable.Width + e.HorizontalChange);
             resizable.Height = Math.Max(40, resizable.Height + e.VerticalChange);
-        }
-
-        // Starts either a pan (if Space is held — handled in the Preview handler below), or a
-        // selection-box drag. Only reaches here for clicks on truly empty canvas space, since
-        // clicks on items already mark the event Handled before bubbling this far.
-        private void CanvasViewport_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
-        {
-            if (isSpaceHeld) return; // Panning is handled separately via the Preview handler
-
-            isSelecting = true;
-            didDrag = false;
-            selectionStartPoint = e.GetPosition(CanvasViewport);
-            CanvasViewport.CaptureMouse();
-        }
-
-
-        // Deletes the selected item on Delete/Backspace — but only when the user isn't actively typing in a TextBox, so editing note text still works normally
-        private void MainWindow_PreviewKeyDown(object sender, KeyEventArgs e)
-        {
-            if (e.Key == Key.Delete && Keyboard.FocusedElement is not TextBox)
-            {
-                ((ViewModel.MainViewModel)DataContext).CurrentBoard.DeleteSelectedItems(); 
-            }
-
-            // Ctrl+S triggers a manual save
-            if (e.Key == Key.S && Keyboard.Modifiers == ModifierKeys.Control)
-            {
-                ((ViewModel.MainViewModel)DataContext).SaveBoardCommand.Execute(null);
-            }
-        }
-
-        // Safety net — saves automatically on exit in case the user forgets to Ctrl+S
-        private void MainWindow_Closing(object sender, System.ComponentModel.CancelEventArgs e)
-        {
-            ((ViewModel.MainViewModel)DataContext).SaveBoardCommand.Execute(null);
         }
 
         // Auto-focuses the TextBox the moment it becomes visible (edit mode starts), and selects all text so typing immediately replaces the placeholder content
@@ -288,12 +258,14 @@ namespace MyBoard
             }
         }
 
+
         // Exits edit mode when the user clicks away — focus naturally leaves the TextBox the moment they click anywhere else (another item, empty canvas, etc.)
         private void NoteEditBox_LostFocus(object sender, RoutedEventArgs e)
         {
             if (sender is TextBox textBox && textBox.DataContext is ViewModel.NoteItemViewModel note)
                 note.IsEditing = false;
         }
+
 
         // Escape exits edit mode without requiring a click elsewhere
         private void NoteEditBox_PreviewKeyDown(object sender, KeyEventArgs e)
@@ -307,6 +279,7 @@ namespace MyBoard
                 e.Handled = true;
             }
         }
+
 
         // Runs BEFORE any other click handling in the window (tunneling), so it can close an actively-edited note before that same click is processed for selection/dragging elsewhere. Fixes LostFocus not firing reliably.
         private void RootGrid_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
@@ -331,6 +304,15 @@ namespace MyBoard
             }
         }
 
+        // Safety net: after ANY click anywhere in the window, clear keyboard focus from whatever was clicked (if it's not a text-input control).
+        // Prevents buttons from retaining focus and hijacking the Space key for their own
+        private void RootGrid_PreviewMouseLeftButtonUp(object sender, MouseButtonEventArgs e)
+        {
+            if (Keyboard.FocusedElement is Button)
+                Keyboard.Focus(RootGrid); 
+        }
+
+
         // Walks up the visual tree checking if 'child' is inside 'ancestor'
         private static bool IsDescendantOf(DependencyObject? child, DependencyObject ancestor)
         {
@@ -340,20 +322,68 @@ namespace MyBoard
                 child = System.Windows.Media.VisualTreeHelper.GetParent(child);
             }
             return false;
-        }
+        }      
 
-        // Safety net: after ANY click anywhere in the window, clear keyboard focus from whatever was clicked (if it's not a text-input control).
-        // Prevents buttons from retaining focus and hijacking the Space key for their own
-        private void RootGrid_PreviewMouseLeftButtonUp(object sender, MouseButtonEventArgs e)
-        {
-            if (Keyboard.FocusedElement is Button)
-                Keyboard.ClearFocus();
-        }
 
         // Tracks whether Space is currently held — while true, LMB-drag pans the canvas instead of selecting/dragging items underneath the cursor
         private bool isSpaceHeld;
         private bool isPanning;
         private Point lastPanMousePosition;
+
+
+        // Deletes the selected item on Delete/Backspace — but only when the user isn't actively typing in a TextBox, so editing note text still works normally
+        private void MainWindow_PreviewKeyDown(object sender, KeyEventArgs e)
+        {
+            bool isTyping = Keyboard.FocusedElement is TextBox;
+            var board = ((ViewModel.MainViewModel)DataContext).CurrentBoard;
+
+            if (e.Key == Key.Delete && Keyboard.FocusedElement is not TextBox)
+            {
+                ((ViewModel.MainViewModel)DataContext).CurrentBoard.DeleteSelectedItems();
+            }
+
+            // Ctrl+S triggers a manual save
+            if (e.Key == Key.S && Keyboard.Modifiers == ModifierKeys.Control)
+            {
+                ((ViewModel.MainViewModel)DataContext).SaveBoardCommand.Execute(null);
+            }
+
+            if (e.Key == Key.Delete && !isTyping)
+                board.DeleteSelectedItems();
+
+            if (e.Key == Key.S && Keyboard.Modifiers == ModifierKeys.Control)
+                ((ViewModel.MainViewModel)DataContext).SaveBoardCommand.Execute(null);
+
+            // Standard cut/copy/paste/duplicate shortcuts — skipped while typing so normal text editing (Ctrl+C inside a note, etc.) isn't hijacked
+            if (!isTyping && Keyboard.Modifiers == ModifierKeys.Control)
+            {
+                switch (e.Key)
+                {
+                    case Key.Z: ((ViewModel.MainViewModel)DataContext).UndoCommand.Execute(null); break;
+                    case Key.Y: ((ViewModel.MainViewModel)DataContext).RedoCommand.Execute(null); break;
+                    case Key.C: board.CopySelectedItems(); break;
+                    case Key.X: board.CutSelectedItems(); break;
+                    case Key.V: board.PasteClipboard(lastCanvasMousePosition.X, lastCanvasMousePosition.Y); break;
+                    case Key.D: board.DuplicateSelectedItems(); break;
+                }
+            }
+
+            // F2 renames a single selected board — same convention as Windows Explorer
+            if (e.Key == Key.F2 && !isTyping &&
+                board.SelectedItems.Count == 1 &&
+                board.SelectedItems[0] is ViewModel.BoardViewModel boardToRename)
+            {
+                boardToRename.BeginEditingTitle(); // was boardViewModel
+            }
+        }
+
+
+        // Safety net — saves automatically on exit in case the user forgets to Ctrl+S
+        private void MainWindow_Closing(object sender, System.ComponentModel.CancelEventArgs e)
+        {
+            ((ViewModel.MainViewModel)DataContext).SaveBoardCommand.Execute(null);
+        }
+
 
         // Space key down: enable pan mode, switch cursor to indicate it
         private void MainWindow_PreviewKeyDown_Pan(object sender, KeyEventArgs e)
@@ -365,6 +395,7 @@ namespace MyBoard
             }
         }
 
+
         private void MainWindow_PreviewKeyUp_Pan(object sender, KeyEventArgs e)
         {
             if (e.Key == Key.Space)
@@ -375,30 +406,30 @@ namespace MyBoard
             }
         }
 
+
         // Safety net: if the window loses focus while Space is held (e.g. Alt-Tab), there's no KeyUp to catch — force pan mode off so the cursor doesn't get stuck
         private void MainWindow_Deactivated(object sender, EventArgs e)
         {
             isSpaceHeld = false;
             isPanning = false;
+            isSelecting = false;
             Mouse.OverrideCursor = null;
-        }
 
-        // Fires BEFORE any item's own click handling (tunneling) — if Space is held, this starts a pan and blocks the click from reaching items underneath
-        private void CanvasViewport_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
-        {
-            if (!isSpaceHeld) return;
-
-            isPanning = true;
-            lastPanMousePosition = e.GetPosition(CanvasViewport);
-            CanvasViewport.CaptureMouse();
-            Mouse.OverrideCursor = Cursors.SizeAll; // Actively panning — replaces the "ready to pan" hand cursor
-            e.Handled = true;
+            if (CanvasViewport.IsMouseCaptured)
+                CanvasViewport.ReleaseMouseCapture();
         }
 
 
+        // Tracks the mouse's position in true canvas coordinate
+        private Point lastCanvasMousePosition;
         private void CanvasViewport_MouseMove(object sender, MouseEventArgs e)
         {
             var viewModel = (ViewModel.MainViewModel)DataContext;
+
+            Point rawPos = e.GetPosition(CanvasViewport);
+            lastCanvasMousePosition = new Point(
+                (rawPos.X - viewModel.PanX) / viewModel.ZoomLevel,
+                (rawPos.Y - viewModel.PanY) / viewModel.ZoomLevel);
 
             if (isPanning)
             {
@@ -423,6 +454,33 @@ namespace MyBoard
                 SelectionBox.Visibility = Visibility.Visible;
             }
         }
+
+
+        // Fires BEFORE any item's own click handling (tunneling) — if Space is held, this starts a pan and blocks the click from reaching items underneath
+        private void CanvasViewport_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+        {
+            if (!isSpaceHeld) return;
+
+            isPanning = true;
+            lastPanMousePosition = e.GetPosition(CanvasViewport);
+            CanvasViewport.CaptureMouse();
+            Mouse.OverrideCursor = Cursors.SizeAll; // Actively panning — replaces the "ready to pan" hand cursor
+            e.Handled = true;
+        }
+
+
+        // Starts either a pan (if Space is held — handled in the Preview handler below), 
+        // Or a selection-box drag. Only reaches here for clicks on truly empty canvas space, since clicks on items already mark the event Handled before bubbling this far.
+        private void CanvasViewport_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+        {
+            if (isSpaceHeld) return; // Panning is handled separately via the Preview handler
+
+            isSelecting = true;
+            didDrag = false;
+            selectionStartPoint = e.GetPosition(CanvasViewport);
+            CanvasViewport.CaptureMouse();
+        }
+
 
         private void CanvasViewport_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
         {
@@ -449,6 +507,7 @@ namespace MyBoard
             }
         }
 
+
         // Finds every item whose rendered bounds intersect the selection rectangle.
         // Uses TransformToAncestor to convert each item's bounds into the same screen-space coordinates as the selection box — this automatically accounts for the canvas's current zoom and pan without needing to manually invert that math.
         private void SelectItemsInBox(ViewModel.MainViewModel viewModel)
@@ -473,6 +532,33 @@ namespace MyBoard
             }
 
             viewModel.CurrentBoard.SelectItems(selected);
+        }
+
+
+        //Click menu hanlders
+        private void MenuItem_Cut_Click(object sender, RoutedEventArgs e) =>
+            ((ViewModel.MainViewModel)DataContext).CurrentBoard.CutSelectedItems();
+
+        private void MenuItem_Copy_Click(object sender, RoutedEventArgs e) =>
+            ((ViewModel.MainViewModel)DataContext).CurrentBoard.CopySelectedItems();
+
+        private void MenuItem_Duplicate_Click(object sender, RoutedEventArgs e) =>
+            ((ViewModel.MainViewModel)DataContext).CurrentBoard.DuplicateSelectedItems();
+
+        private void MenuItem_Delete_Click(object sender, RoutedEventArgs e) =>
+            ((ViewModel.MainViewModel)DataContext).CurrentBoard.DeleteSelectedItems();
+
+        private void MenuItem_Rename_Click(object sender, RoutedEventArgs e)
+        {
+            var board = ((ViewModel.MainViewModel)DataContext).CurrentBoard;
+            if (board.SelectedItems.Count == 1 && board.SelectedItems[0] is ViewModel.BoardViewModel boardToRename)
+                boardToRename.BeginEditingTitle(); // was boardViewModel
+        }
+
+        private void MenuItem_PasteCanvas_Click(object sender, RoutedEventArgs e)
+        {
+            var board = ((ViewModel.MainViewModel)DataContext).CurrentBoard;
+            board.PasteClipboard(lastCanvasMousePosition.X, lastCanvasMousePosition.Y);
         }
     }
 }
