@@ -26,6 +26,9 @@ namespace MyBoard.ViewModel
         private string title;
 
         [ObservableProperty]
+        private string color = "#B39DDB";
+
+        [ObservableProperty]
         private bool isSelected;
 
         // Tracks which item is currently selected on this board, if any
@@ -37,6 +40,10 @@ namespace MyBoard.ViewModel
         [ObservableProperty]
         private bool isEditingTitle;
 
+        // The single selected item, if exactly one thing is selected drives which design tools appear in the sidebar
+        [ObservableProperty]
+        private object? primarySelectedItem;
+
         public ObservableCollection<object> Items { get; } = new();
 
         //Undo and Redo
@@ -44,16 +51,17 @@ namespace MyBoard.ViewModel
 
 
         public BoardViewModel(Board model, UndoRedoManager undoRedo)
-{
-    this.undoRedo = undoRedo;
-    Model = model; // this line was missing entirely
-    x = model.X;
-    y = model.Y;
-    title = model.Title;
+        {
+            this.undoRedo = undoRedo;
+            Model = model; // this line was missing entirely
+            x = model.X;
+            y = model.Y;
+            title = model.Title;
 
-    foreach (var item in model.Items)
-        Items.Add(WrapModel(item));
-}
+
+            foreach (var item in model.Items)
+                Items.Add(WrapModel(item));
+        }
 
 
         private object WrapModel(ICanvasItem item) => item switch
@@ -86,6 +94,7 @@ namespace MyBoard.ViewModel
             undoRedo.Do(new AddItemCommand(Model.Items, Items, board, vm));
             vm.IsEditingTitle = true;
             return vm;
+
         }
 
 
@@ -109,6 +118,10 @@ namespace MyBoard.ViewModel
 
             IsEditingTitle = false;
         }
+
+
+        //Changing color of the board
+        partial void OnColorChanged(string value) => Model.Color = value;
 
 
         // Creates a new ImageItem at the given position — used by drag-and-drop.
@@ -137,6 +150,7 @@ namespace MyBoard.ViewModel
                 selectable.IsSelected = true;
 
             SelectedItems.Add(item);
+            PrimarySelectedItem = item;
         }
 
 
@@ -154,6 +168,8 @@ namespace MyBoard.ViewModel
                     selectable.IsSelected = true;
                 SelectedItems.Add(item);
             }
+
+            PrimarySelectedItem = SelectedItems.Count == 1 ? SelectedItems[0] : null;
         }
 
 
@@ -163,6 +179,8 @@ namespace MyBoard.ViewModel
             foreach (var existing in Items.OfType<ISelectable>())
                 existing.IsSelected = false;
             SelectedItems.Clear();
+
+            PrimarySelectedItem = null;
         }
 
 
@@ -179,6 +197,8 @@ namespace MyBoard.ViewModel
                 undoRedo.Do(new DeleteItemsCommand(Model.Items, Items, removed));
 
             SelectedItems.Clear();
+
+            PrimarySelectedItem = null;
         }
 
 
@@ -188,6 +208,7 @@ namespace MyBoard.ViewModel
             var models = SelectedItems.OfType<ICanvasItemViewModel>().Select(vm => vm.Model);
             ClipboardService.SetCopy(models);
         }
+
 
         // Copies the current selection, then removes it from this board — the "move" half of cut/paste
         public void CutSelectedItems()
@@ -230,6 +251,7 @@ namespace MyBoard.ViewModel
             if (ClipboardService.IsCutOperation)
                 ClipboardService.Items.Clear();
         }
+
 
         // Duplicates the current selection in place, offset slightly so the copy is visually distinguishable from the original
         public void DuplicateSelectedItems()

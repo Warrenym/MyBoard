@@ -11,6 +11,7 @@ namespace MyBoard.Model
         public double X { get; set; }
         public double Y { get; set; }
         public string Title { get; set; } = "Untitled Board";
+        public string Color { get; set; } = "#B39DDB";
         public Guid? ParentBoardId { get; set; }
         public ObservableCollection<ICanvasItem> Items { get; set; } = new();
     }

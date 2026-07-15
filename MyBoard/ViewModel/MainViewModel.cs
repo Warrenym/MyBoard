@@ -21,13 +21,17 @@ namespace MyBoard.ViewModel
         [ObservableProperty]
         private double panY;
 
-        // Human-readable zoom percentage, e.g. "150%" — kept in sync automatically
-        // whenever ZoomLevel changes, so the UI has a ready-to-display string.
+        // Human-readable zoom percentage, e.g. "150%" — kept in sync automatically whenever ZoomLevel changes, so the UI has a ready-to-display string.
         [ObservableProperty]
         private double zoomLevel = 1.0;
 
         [ObservableProperty]
         private string zoomDisplayText = "100%";
+
+        //Popover open state
+        [ObservableProperty]
+        private bool isColorPopoverOpen;
+
 
         partial void OnZoomLevelChanged(double value)
         {
@@ -106,5 +110,33 @@ namespace MyBoard.ViewModel
             var newBoard = CurrentBoard.AddBoard();
             CurrentBoard.SelectItem(newBoard); // Highlights it immediately, matching File Explorer's new-folder behavior
         }
+
+
+        //Toggle popover
+        [RelayCommand]
+        private void ToggleColorPopover()
+        {
+            IsColorPopoverOpen = !IsColorPopoverOpen;
+        }
+
+
+        private string colorBeforeEdit = "";
+
+        partial void OnIsColorPopoverOpenChanged(bool value)
+        {
+            if (value && CurrentBoard.PrimarySelectedItem is BoardViewModel board)
+            {
+                colorBeforeEdit = board.Color; // capture starting point when opening
+                BoardColorPickerRequested?.Invoke(this, board.Color);
+            }
+            else if (!value && CurrentBoard.PrimarySelectedItem is BoardViewModel closedBoard)
+            {
+                // Only record if the color actually changed during this session
+                if (closedBoard.Color != colorBeforeEdit)
+                    UndoRedo.Record(new Commands.ColorChangeCommand(closedBoard, colorBeforeEdit, closedBoard.Color));
+            }
+        }
+
+        public event EventHandler<string>? BoardColorPickerRequested;
     }
 }

@@ -10,6 +10,7 @@ using System.Windows.Data;
 using System.Windows.Documents;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Media.Animation;
 using System.Windows.Media.Imaging;
 using System.Windows.Navigation;
 using System.Windows.Shapes;
@@ -26,7 +27,16 @@ namespace MyBoard
             PreviewKeyDown += MainWindow_PreviewKeyDown;
             PreviewKeyDown += MainWindow_PreviewKeyDown_Pan;
             PreviewKeyUp += MainWindow_PreviewKeyUp_Pan;
+           // ((ViewModel.MainViewModel)DataContext).BoardColorPickerRequested += (s, hex) =>
+           //     BoardColorPicker.LoadColor(hex);
             Closing += MainWindow_Closing;
+
+            var viewModel = (ViewModel.MainViewModel)DataContext;
+            viewModel.CurrentBoard.PropertyChanged += (s, e) =>
+            {
+                if (e.PropertyName == nameof(ViewModel.BoardViewModel.PrimarySelectedItem))
+                    SlideSidebarPanel(viewModel.CurrentBoard.PrimarySelectedItem != null);
+            };
         }
 
         private bool isSelecting;
@@ -95,6 +105,38 @@ namespace MyBoard
             }
         }
 
+        private const double SidebarPanelWidth = 180;
+        // Slides the sidebar's inner panel to reveal Design tools when something is selected
+        private void SlideSidebarPanel(bool showDesignPanel)
+        {
+            
+
+            var animation = new DoubleAnimation
+            {
+                To = showDesignPanel ? -SidebarPanelWidth : 0,
+                Duration = TimeSpan.FromMilliseconds(220),
+                EasingFunction = new CubicEase
+                {
+                    EasingMode = EasingMode.EaseInOut
+                },
+                FillBehavior = FillBehavior.HoldEnd
+            };
+
+            SidebarSlideTransform.BeginAnimation(
+                TranslateTransform.XProperty,
+                animation);
+        }
+
+        private void Board_PropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+        {
+            System.Diagnostics.Debug.WriteLine($"Board_PropertyChanged fired: {e.PropertyName}");
+
+            if (e.PropertyName == nameof(ViewModel.BoardViewModel.PrimarySelectedItem) && sender is ViewModel.BoardViewModel board)
+            {
+                System.Diagnostics.Debug.WriteLine($"PrimarySelectedItem changed, value is null? {board.PrimarySelectedItem == null}");
+                SlideSidebarPanel(board.PrimarySelectedItem != null);
+            }
+        }
 
         // Auto-focuses the title TextBox the moment it appears, and selects all text so typing immediately replaces it (matches the Note editing pattern)
         private void BoardTitleEditBox_Loaded(object sender, RoutedEventArgs e)
@@ -170,6 +212,16 @@ namespace MyBoard
                 board.BeginEditingTitle(); 
                 e.Handled = true;
             }
+        }
+
+
+        // Fires every time the color picker's color changes — 
+        // Applies it instantly to whichever board is currently selected, satisfying the "updates nstantly" sync requirement
+        private void BoardColorPicker_ColorSelected(object? sender, string hexColor)
+        {
+            var viewModel = (ViewModel.MainViewModel)DataContext;
+            if (viewModel.CurrentBoard.PrimarySelectedItem is ViewModel.BoardViewModel board)
+                board.Color = hexColor;
         }
 
 
@@ -375,6 +427,9 @@ namespace MyBoard
             {
                 boardToRename.BeginEditingTitle(); // was boardViewModel
             }
+
+            if (e.Key == Key.Escape)
+                ((ViewModel.MainViewModel)DataContext).IsColorPopoverOpen = false;
         }
 
 

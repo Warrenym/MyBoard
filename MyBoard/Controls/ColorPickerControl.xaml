@@ -1,0 +1,120 @@
+﻿<UserControl x:Class="MyBoard.Controls.ColorPickerControl"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
+             xmlns:local="clr-namespace:MyBoard.Controls"
+             mc:Ignorable="d" 
+             d:DesignHeight="450" d:DesignWidth="800">
+    
+    <StackPanel Width="200">
+
+        
+        <!-- Saturation/Brightness square: hue-colored background with two
+             overlaid gradients (white L-R, black T-B) to carve out the
+             classic color-picker gradient square -->
+        <Grid x:Name="SVSquare" Height="150" Margin="0,0,0,10"
+              MouseLeftButtonDown="SVSquare_MouseLeftButtonDown"
+              MouseMove="SVSquare_MouseMove"
+              MouseLeftButtonUp="SVSquare_MouseLeftButtonUp">
+
+            <Rectangle x:Name="HueBackground" RadiusX="4" RadiusY="4"/>
+
+            <Rectangle RadiusX="4" RadiusY="4">
+                <Rectangle.Fill>
+                    <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
+                        <GradientStop Color="White" Offset="0"/>
+                        <GradientStop Color="Transparent" Offset="1"/>
+                    </LinearGradientBrush>
+                </Rectangle.Fill>
+            </Rectangle>
+
+            <Rectangle RadiusX="4" RadiusY="4">
+                <Rectangle.Fill>
+                    <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                        <GradientStop Color="Transparent" Offset="0"/>
+                        <GradientStop Color="Black" Offset="1"/>
+                    </LinearGradientBrush>
+                </Rectangle.Fill>
+            </Rectangle>
+
+            
+            <!-- Selection cursor — repositioned in code-behind via Margin -->
+            <Ellipse x:Name="SVCursor" Width="14" Height="14"
+                     Fill="White" Stroke="#333333" StrokeThickness="1.5"
+                     IsHitTestVisible="False"
+                     HorizontalAlignment="Left" VerticalAlignment="Top">
+                <Ellipse.Effect>
+                    <DropShadowEffect BlurRadius="4" ShadowDepth="1" Opacity="0.4"/>
+                </Ellipse.Effect>
+            </Ellipse>
+        </Grid>
+
+        <!-- Preview swatch + hue slider, side by side -->
+        <Grid Margin="0,0,0,10">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+
+            <Ellipse Grid.Column="0" Width="24" Height="24"
+                     Stroke="#CCCCCC" StrokeThickness="1"
+                     Margin="0,0,10,0" x:Name="PreviewSwatch"/>
+
+            <Grid Grid.Column="1" x:Name="HueSliderTrack" Height="16"
+                  MouseLeftButtonDown="HueSlider_MouseLeftButtonDown"
+                  MouseMove="HueSlider_MouseMove"
+                  MouseLeftButtonUp="HueSlider_MouseLeftButtonUp">
+
+                <Rectangle RadiusX="8" RadiusY="8">
+                    <Rectangle.Fill>
+                        <!-- Standard HSV hue order: Red(0°) → Yellow(60°) →
+                             Green(120°) → Cyan(180°) → Blue(240°) → Magenta(300°) → Red(360°) -->
+                        <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
+                            <GradientStop Color="#FF0000" Offset="0"/>
+                            <GradientStop Color="#FFFF00" Offset="0.1667"/>
+                            <GradientStop Color="#00FF00" Offset="0.3333"/>
+                            <GradientStop Color="#00FFFF" Offset="0.5"/>
+                            <GradientStop Color="#0000FF" Offset="0.6667"/>
+                            <GradientStop Color="#FF00FF" Offset="0.8333"/>
+                            <GradientStop Color="#FF0000" Offset="1"/>
+                        </LinearGradientBrush>
+                    </Rectangle.Fill>
+                </Rectangle>
+
+                <Ellipse x:Name="HueThumb" Width="16" Height="16"
+                         Fill="White" Stroke="#333333" StrokeThickness="1.5"
+                         IsHitTestVisible="False"
+                         HorizontalAlignment="Left" VerticalAlignment="Center"/>
+            </Grid>
+        </Grid>
+
+        <!-- RGB numeric fields -->
+        <Grid>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition/>
+                <ColumnDefinition/>
+                <ColumnDefinition/>
+            </Grid.ColumnDefinitions>
+
+            <StackPanel Grid.Column="0" Margin="0,0,4,0">
+                <TextBox x:Name="RBox" Text="{Binding R}" TextAlignment="Center"
+                         PreviewTextInput="RgbBox_PreviewTextInput" LostFocus="RgbBox_LostFocus"/>
+                <TextBlock Text="R" HorizontalAlignment="Center" FontSize="11" Foreground="#8A8A8A"/>
+            </StackPanel>
+
+            <StackPanel Grid.Column="1" Margin="4,0">
+                <TextBox x:Name="GBox" Text="{Binding G}" TextAlignment="Center"
+                         PreviewTextInput="RgbBox_PreviewTextInput" LostFocus="RgbBox_LostFocus"/>
+                <TextBlock Text="G" HorizontalAlignment="Center" FontSize="11" Foreground="#8A8A8A"/>
+            </StackPanel>
+
+            <StackPanel Grid.Column="2" Margin="4,0,0,0">
+                <TextBox x:Name="BBox" Text="{Binding B}" TextAlignment="Center"
+                         PreviewTextInput="RgbBox_PreviewTextInput" LostFocus="RgbBox_LostFocus"/>
+                <TextBlock Text="B" HorizontalAlignment="Center" FontSize="11" Foreground="#8A8A8A"/>
+            </StackPanel>
+        </Grid>
+    </StackPanel>
+</UserControl>
+    
