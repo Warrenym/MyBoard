@@ -114,6 +114,7 @@ namespace MyBoard.Controls
             isDraggingSV = true;
             SVSquare.CaptureMouse();
             UpdateSVFromMouse(e.GetPosition(SVSquare));
+            e.Handled = true; // Prevents the popup's own click handling from interfering with capture
         }
 
         private void SVSquare_MouseMove(object sender, MouseEventArgs e)
@@ -146,6 +147,7 @@ namespace MyBoard.Controls
             isDraggingHue = true;
             HueSliderTrack.CaptureMouse();
             UpdateHueFromMouse(e.GetPosition(HueSliderTrack));
+            e.Handled = true; // Same fix, same reason
         }
 
         private void HueSlider_MouseMove(object sender, MouseEventArgs e)

@@ -364,7 +364,7 @@
                                 <DoubleAnimation
                                     Storyboard.TargetProperty="Width"
                                     To="60"
-                                    Duration="0:0:0.15"/>   
+                                    Duration="0:0:0.15"/>
                             </Storyboard>
                         </BeginStoryboard>
                     </EventTrigger>
@@ -385,7 +385,7 @@
                         <Border Width="180"
                                 Height="{Binding ActualHeight, RelativeSource={RelativeSource AncestorType=Grid}}"
                                 Background="{StaticResource SidebarBrush}"
-                                Canvas.Left="0">    
+                                Canvas.Left="0">
 
                             <StackPanel>
 
@@ -419,19 +419,44 @@
                         <Border Width="180"
                                 Height="{Binding ActualHeight, RelativeSource={RelativeSource AncestorType=Grid}}"
                                 Canvas.Left="180"
-                                Background="Yellow">    
+                                Background="{StaticResource SidebarBrush}">
 
-                            <Grid>
+                            <StackPanel>
+                                <Button x:Name="ColorToolButton"
+                                        Command="{Binding ToggleColorPopoverCommand}"
+                                        Style="{StaticResource SidebarButtonStyle}">
+                                    <StackPanel Orientation="Horizontal">
+                                        <Border Width="18" Height="18" CornerRadius="4"
+                                                Background="{Binding CurrentBoard.PrimarySelectedItem.Color, Converter={StaticResource HexToBrush}}"
+                                                BorderBrush="#CCCCCC" BorderThickness="1"
+                                                Margin="6,0,0,0"/>
+                                        <TextBlock Text="Color" Style="{StaticResource BodyText}" VerticalAlignment="Center" Margin="10,0,0,0"
+                                                   Visibility="{Binding IsMouseOver, ElementName=Sidebar, Converter={StaticResource BoolToVis}}"/>
+                                    </StackPanel>
+                                </Button>
 
-                                <TextBlock Text="TEST 123"
-                               FontSize="28"
-                               FontWeight="Bold"
-                               Foreground="Black"
-                               HorizontalAlignment="Center"
-                               VerticalAlignment="Center"/>
-
-                            </Grid>
-
+                                <Popup x:Name="ColorPopup"
+                                       Placement="Absolute"
+                                       AllowsTransparency="True"
+                                       StaysOpen="False"
+                                       PopupAnimation="Fade"
+                                       IsOpen="{Binding IsColorPopoverOpen}"
+                                       Opened="ColorPopup_Opened">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <Polygon Grid.Column="0" Points="8,0 8,16 0,8" Fill="{StaticResource SidebarBrush}"
+                                                VerticalAlignment="Center" Margin="0,0,-1,0"/>
+                                        <Border Grid.Column="1" Background="{StaticResource SidebarBrush}"
+                                                CornerRadius="8" Padding="14" Effect="{StaticResource SoftShadow}">
+                                            <controls:ColorPickerControl x:Name="BoardColorPicker"
+                                          ColorSelected="BoardColorPicker_ColorSelected"/>
+                                        </Border>
+                                    </Grid>
+                                </Popup>
+                            </StackPanel>
                         </Border>
 
                     </Canvas>
@@ -441,13 +466,11 @@
                                Fill="{StaticResource BorderBrush}"
                                HorizontalAlignment="Right"
                                VerticalAlignment="Stretch"
-                               IsHitTestVisible="False"/>   
+                               IsHitTestVisible="False"/>
 
                 </Grid>
 
             </Border>
-
-
 
 
             <!-- Zoom percentage indicator — floats in the bottom-center of the canvas -->

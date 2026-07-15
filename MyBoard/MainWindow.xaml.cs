@@ -27,8 +27,8 @@ namespace MyBoard
             PreviewKeyDown += MainWindow_PreviewKeyDown;
             PreviewKeyDown += MainWindow_PreviewKeyDown_Pan;
             PreviewKeyUp += MainWindow_PreviewKeyUp_Pan;
-           // ((ViewModel.MainViewModel)DataContext).BoardColorPickerRequested += (s, hex) =>
-           //     BoardColorPicker.LoadColor(hex);
+            ((ViewModel.MainViewModel)DataContext).BoardColorPickerRequested += (s, hex) =>
+                BoardColorPicker.LoadColor(hex);
             Closing += MainWindow_Closing;
 
             var viewModel = (ViewModel.MainViewModel)DataContext;
@@ -125,6 +125,16 @@ namespace MyBoard
             SidebarSlideTransform.BeginAnimation(
                 TranslateTransform.XProperty,
                 animation);
+        }
+
+        private void ColorPopup_Opened(object sender, EventArgs e)
+        {
+            var popup = (Popup)sender;
+            Point screenPoint = ColorToolButton.PointToScreen(
+                new Point(ColorToolButton.ActualWidth + 8, 0));
+
+            popup.HorizontalOffset = screenPoint.X;
+            popup.VerticalOffset = screenPoint.Y;
         }
 
         private void Board_PropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
