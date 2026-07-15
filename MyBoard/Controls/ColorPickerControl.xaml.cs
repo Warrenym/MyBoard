@@ -27,7 +27,10 @@ namespace MyBoard.Controls
             DataContextChanged += ColorPickerControl_DataContextChanged;
 
             if (DataContext is ColorPickerViewModel vm)
+            {
                 vm.ColorChanged += (s, e) => ColorSelected?.Invoke(this, vm.HexColor);
+                vm.ColorChanged += ViewModel_ColorChanged; // ← the missing subscription, added directly here
+            }
         }
 
 

@@ -2,12 +2,18 @@
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:local="clr-namespace:MyBoard"
+             xmlns:converters="clr-namespace:MyBoard.Converters"
              StartupUri="MainWindow.xaml">
     <Application.Resources>
         <ResourceDictionary>
             <ResourceDictionary.MergedDictionaries>
                 <ResourceDictionary Source="Styles/Theme.xaml"/>
             </ResourceDictionary.MergedDictionaries>
+
+            <!-- Converts bool -> Visibility, used to show sidebar labels only while expanded -->
+            <BooleanToVisibilityConverter x:Key="BoolToVis"/>
+            <converters:HexToBrushConverter x:Key="HexToBrush"/>
+            <converters:NullToVisibilityConverter x:Key="NullToVisibilityConverter"/>
         </ResourceDictionary>
     </Application.Resources>
 </Application>

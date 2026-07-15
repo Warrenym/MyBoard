@@ -13,10 +13,7 @@
 
 
     <Window.Resources>
-        <!-- Converts bool -> Visibility, used to show sidebar labels only while expanded -->
-        <BooleanToVisibilityConverter x:Key="BoolToVis"/>
-        <converters:HexToBrushConverter x:Key="HexToBrush"/>
-        <converters:NullToVisibilityConverter x:Key="NullToVisibilityConverter"/>
+        
     </Window.Resources>
         
         
@@ -343,7 +340,9 @@
                     Width="60"
                     Panel.ZIndex="10"
                     ClipToBounds="True"
-                    Effect="{StaticResource SoftShadow}">
+                    Effect="{StaticResource SoftShadow}"
+                    MouseEnter="Sidebar_MouseEnter"
+                    MouseLeave="Sidebar_MouseLeave">        
 
                 <Border.Triggers>
 
@@ -393,10 +392,10 @@
                                         Style="{StaticResource SidebarButtonStyle}">
                                     <StackPanel Orientation="Horizontal">
                                         <TextBlock Text="📝" Width="30"/>
-                                        <TextBlock Text="Note"
-                                                    Visibility="{Binding IsMouseOver,
-                                                                ElementName=Sidebar,
-                                                                Converter={StaticResource BoolToVis}}"/>
+                                        <TextBlock Text="Note" 
+                                                   Visibility="{Binding IsSidebarExpanded, 
+                                                                RelativeSource={RelativeSource AncestorType=Window}, 
+                                                                Converter={StaticResource BoolToVis}}"/>    
                                     </StackPanel>
                                 </Button>
 
@@ -405,9 +404,9 @@
                                     <StackPanel Orientation="Horizontal">
                                         <TextBlock Text="📁" Width="30"/>
                                         <TextBlock Text="Board"
-                                                    Visibility="{Binding IsMouseOver,
-                                                                 ElementName=Sidebar,
-                                                                 Converter={StaticResource BoolToVis}}"/>
+                                                    Visibility="{Binding IsSidebarExpanded, 
+                                                                 RelativeSource={RelativeSource AncestorType=Window}, 
+                                                                 Converter={StaticResource BoolToVis}}"/>        
                                     </StackPanel>
                                 </Button>
 
@@ -421,42 +420,36 @@
                                 Canvas.Left="180"
                                 Background="{StaticResource SidebarBrush}">
 
-                            <StackPanel>
-                                <Button x:Name="ColorToolButton"
-                                        Command="{Binding ToggleColorPopoverCommand}"
-                                        Style="{StaticResource SidebarButtonStyle}">
-                                    <StackPanel Orientation="Horizontal">
-                                        <Border Width="18" Height="18" CornerRadius="4"
-                                                Background="{Binding CurrentBoard.PrimarySelectedItem.Color, Converter={StaticResource HexToBrush}}"
-                                                BorderBrush="#CCCCCC" BorderThickness="1"
-                                                Margin="6,0,0,0"/>
-                                        <TextBlock Text="Color" Style="{StaticResource BodyText}" VerticalAlignment="Center" Margin="10,0,0,0"
-                                                   Visibility="{Binding IsMouseOver, ElementName=Sidebar, Converter={StaticResource BoolToVis}}"/>
-                                    </StackPanel>
-                                </Button>
+                            <!-- Shows different tools depending on the selected item's TYPE adding a new item type's design tools later means adding one
+                                 DataTemplate here, no code-behind or duplicated wiring needed -->
+                            <ContentControl Content="{Binding CurrentBoard.PrimarySelectedItem}">
+                                <ContentControl.Resources>
 
-                                <Popup x:Name="ColorPopup"
-                                       Placement="Absolute"
-                                       AllowsTransparency="True"
-                                       StaysOpen="False"
-                                       PopupAnimation="Fade"
-                                       IsOpen="{Binding IsColorPopoverOpen}"
-                                       Opened="ColorPopup_Opened">
-                                    <Grid>
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="Auto"/>
-                                            <ColumnDefinition Width="Auto"/>
-                                        </Grid.ColumnDefinitions>
-                                        <Polygon Grid.Column="0" Points="8,0 8,16 0,8" Fill="{StaticResource SidebarBrush}"
-                                                VerticalAlignment="Center" Margin="0,0,-1,0"/>
-                                        <Border Grid.Column="1" Background="{StaticResource SidebarBrush}"
-                                                CornerRadius="8" Padding="14" Effect="{StaticResource SoftShadow}">
-                                            <controls:ColorPickerControl x:Name="BoardColorPicker"
-                                          ColorSelected="BoardColorPicker_ColorSelected"/>
-                                        </Border>
-                                    </Grid>
-                                </Popup>
-                            </StackPanel>
+                                    <DataTemplate DataType="{x:Type vm:BoardViewModel}">
+                                        <StackPanel>
+                                            <controls:ColorPickerButton x:Name="BoardColorTool"
+                                                                        SelectedColor="{Binding Color, Mode=TwoWay}"
+                                                                        IsExpanded="{Binding IsSidebarExpanded, RelativeSource
+                                                                                   ={RelativeSource AncestorType=Window}}"
+                                                                        ColorSelected="DesignColorPicker_ColorSelected"
+                                                                        PopoverOpened="DesignColorPicker_PopoverOpened"
+                                                                        PopoverClosed="DesignColorPicker_PopoverClosed"/>
+                                        </StackPanel>
+                                    </DataTemplate>
+
+                                    <!-- Future: a DataTemplate for vm:NoteItemViewModel or
+                                         vm:ImageItemViewModel would go here, reusing the same
+                                         ColorPickerButton control if/when those get color options -->
+                                    <DataTemplate DataType="{x:Type vm:NoteItemViewModel}">
+                                        <Grid/>
+                                    </DataTemplate>
+
+                                    <DataTemplate DataType="{x:Type vm:ImageItemViewModel}">
+                                        <Grid/>
+                                    </DataTemplate>
+
+                                </ContentControl.Resources>
+                            </ContentControl>
                         </Border>
 
                     </Canvas>

@@ -57,6 +57,7 @@ namespace MyBoard.ViewModel
             x = model.X;
             y = model.Y;
             title = model.Title;
+            color = model.Color;
 
 
             foreach (var item in model.Items)
