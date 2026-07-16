@@ -1,0 +1,115 @@
+﻿using System.Collections.ObjectModel;
+using CommunityToolkit.Mvvm.ComponentModel;
+using MyBoard.Model;
+using MyBoard.Services;
+
+namespace MyBoard.ViewModel
+{
+    // Identifies which row a color belongs to
+    public enum PaletteRow
+    {
+        Default,
+        Saved,
+        Recent
+    }
+
+
+    // Owns the app-wide color palette
+    partial class ColorPaletteViewModel : ObservableObject
+    {
+        private const int MaxRecentlyPicked = 10;
+
+        // Fixed baseline palette — never modified at runtime, so no persistence needed for it
+        public ObservableCollection<string> DefaultColors { get; } = new()
+        {
+            "#F44336", "#E91E63", "#9C27B0", "#673AB7",
+            "#3F51B5", "#2196F3", "#009688", "#4CAF50",
+            "#FFEB3B", "#FF9800", "#795548", "#607D8B"
+        };
+
+        public ObservableCollection<string> SavedColors { get; } = new();
+        public ObservableCollection<string> RecentlyPicked { get; } = new();
+
+
+        public ColorPaletteViewModel()
+        {
+            var data = ColorPaletteService.Load();
+            foreach (var color in data.SavedColors) SavedColors.Add(color);
+            foreach (var color in data.RecentlyPicked) RecentlyPicked.Add(color);
+        }
+
+
+        // Call this every time a color is actually applied via the picker
+        // (not on every drag-tick — the caller decides when a "pick" is final, same pattern as how undo/redo only records once per completed edit)
+        public void RecordRecentlyPicked(string hex)
+        {
+            // Move to front if it already exists, rather than allowing duplicates
+            if (RecentlyPicked.Contains(hex))
+                RecentlyPicked.Remove(hex);
+
+            RecentlyPicked.Insert(0, hex);
+
+            while (RecentlyPicked.Count > MaxRecentlyPicked)
+                RecentlyPicked.RemoveAt(RecentlyPicked.Count - 1);
+
+            Persist();
+        }
+
+
+        // Adds a color to the Saved row — used both by "save this color" from the picker, and by drag-and-drop moves in edit mode later
+        public void AddToSaved(string hex)
+        {
+            if (!SavedColors.Contains(hex))
+                SavedColors.Add(hex);
+
+            Persist();
+        }
+
+
+        public void RemoveFromSaved(string hex)
+        {
+            SavedColors.Remove(hex);
+            Persist();
+        }
+
+
+        public void RemoveFromRecentlyPicked(string hex)
+        {
+            RecentlyPicked.Remove(hex);
+            Persist();
+        }
+
+
+        // Central place enforcing your movement rules —
+        // the UI's drag-and-drop handler (step 5) will call this and let it decide what's allowed, rather than duplicating the rule-checking in the View.
+        public bool TryMoveColor(string hex, PaletteRow from, PaletteRow to)
+        {
+            // Default -> Recent is the one explicitly disallowed move
+            if (from == PaletteRow.Default && to == PaletteRow.Recent)
+                return false;
+
+            // Moving OUT of Default doesn't remove it from Default (it's fixed), but moving INTO Default or Saved from elsewhere should add it there
+            if (to == PaletteRow.Saved && !SavedColors.Contains(hex))
+                SavedColors.Add(hex);
+
+            if (from == PaletteRow.Saved && to != PaletteRow.Saved)
+                SavedColors.Remove(hex);
+
+            if (from == PaletteRow.Recent && to != PaletteRow.Recent)
+                RecentlyPicked.Remove(hex);
+
+            Persist();
+            return true;
+        }
+
+
+        private void Persist()
+        {
+            ColorPaletteService.Save(new Model.ColorPaletteData
+            {
+                SavedColors = SavedColors.ToList(),
+                RecentlyPicked = RecentlyPicked.ToList()
+            });
+        }
+    }
+}

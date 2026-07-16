@@ -16,9 +16,6 @@
             </StackPanel>
         </Button>
 
-        <!-- Placement="Absolute" + manual positioning in code-behind is what makes this
-             work correctly regardless of any RenderTransform on ancestors (like the
-             sidebar's slide animation) — WPF's automatic placement modes ignore those. -->
         <Popup x:Name="ColorPopup"
                Placement="Absolute"
                AllowsTransparency="True"
@@ -31,21 +28,15 @@
                     <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
-
-                <!-- Diamond notch: a square rotated 45°, pulled halfway into the panel
-                     via negative margin so only the pointed left half is visible,
-                     seamlessly merging with the panel's edge (same background = no seam) -->
-                <Border Grid.Column="0" Width="14" Height="14"
-                        Background="{StaticResource SidebarBrush}"
-                        VerticalAlignment="Top" Margin="0,18,-7,0"> 
-                    <Border.RenderTransform>
-                        <RotateTransform Angle="45"/>
-                    </Border.RenderTransform>
-                </Border>
-
                 <Border Grid.Column="1" Background="{StaticResource SidebarBrush}"
                         CornerRadius="8" Padding="14" Effect="{StaticResource SoftShadow}">
-                    <controls:ColorPickerControl x:Name="InnerColorPicker" ColorSelected="InnerColorPicker_ColorSelected"/>
+                    <StackPanel>
+                        <controls:ColorPaletteRows x:Name="PaletteRows"
+                                                    DataContext="{Binding Palette, ElementName=Root}"
+                                                    SwatchClicked="PaletteRows_SwatchClicked"/>
+                        <Border Height="1" Background="#EEEEEE" Margin="0,10"/>
+                        <controls:ColorPickerControl x:Name="InnerColorPicker" ColorSelected="InnerColorPicker_ColorSelected"/>
+                    </StackPanel>
                 </Border>
             </Grid>
         </Popup>

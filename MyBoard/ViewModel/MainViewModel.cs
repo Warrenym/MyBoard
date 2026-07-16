@@ -33,6 +33,9 @@ namespace MyBoard.ViewModel
         private bool isColorPopoverOpen;
 
 
+        public ColorPaletteViewModel ColorPalette { get; } = new();
+
+
         partial void OnZoomLevelChanged(double value)
         {
             ZoomDisplayText = $"{value * 100:0}%";

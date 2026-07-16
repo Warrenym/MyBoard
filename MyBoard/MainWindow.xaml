@@ -429,8 +429,10 @@
                                         <StackPanel>
                                             <controls:ColorPickerButton x:Name="BoardColorTool"
                                                                         SelectedColor="{Binding Color, Mode=TwoWay}"
-                                                                        IsExpanded="{Binding IsSidebarExpanded, RelativeSource
-                                                                                   ={RelativeSource AncestorType=Window}}"
+                                                                        IsExpanded="{Binding IsSidebarExpanded, 
+                                                                                             RelativeSource={RelativeSource AncestorType=Window}}"
+                                                                        Palette="{Binding DataContext.ColorPalette, 
+                                                                                          RelativeSource={RelativeSource AncestorType=Window}}"
                                                                         ColorSelected="DesignColorPicker_ColorSelected"
                                                                         PopoverOpened="DesignColorPicker_PopoverOpened"
                                                                         PopoverClosed="DesignColorPicker_PopoverClosed"/>

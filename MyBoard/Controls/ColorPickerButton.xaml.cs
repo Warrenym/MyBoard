@@ -3,14 +3,18 @@ using System.Windows.Controls;
 
 namespace MyBoard.Controls
 {
-    // A self-contained "Color" tool: button + swatch + popover, reusable for
-    // any selectable item type. Owns its own popup positioning fix, so no future design-panel tool needs to re-solve the RenderTransform problem.
     public partial class ColorPickerButton : UserControl
     {
-
         public static readonly DependencyProperty SelectedColorProperty =
             DependencyProperty.Register(nameof(SelectedColor), typeof(string), typeof(ColorPickerButton),
                 new PropertyMetadata("#B39DDB"));
+
+
+        public string SelectedColor
+        {
+            get => (string)GetValue(SelectedColorProperty);
+            set => SetValue(SelectedColorProperty, value);
+        }
 
 
         public static readonly DependencyProperty IsExpandedProperty =
@@ -23,56 +27,81 @@ namespace MyBoard.Controls
             get => (bool)GetValue(IsExpandedProperty);
             set => SetValue(IsExpandedProperty, value);
         }
-        public string SelectedColor
+
+
+        // The shared app-wide palette — set once by whoever hosts this control
+        // (MainWindow, bound to MainViewModel.ColorPalette)
+        public static readonly DependencyProperty PaletteProperty =
+            DependencyProperty.Register(nameof(Palette), typeof(object), typeof(ColorPickerButton));
+
+
+        public object Palette
         {
-            get => (string)GetValue(SelectedColorProperty);
-            set => SetValue(SelectedColorProperty, value);
+            get => GetValue(PaletteProperty);
+            set => SetValue(PaletteProperty, value);
         }
 
-        // Fires on every live change while dragging in the picker
-        public event EventHandler<string>? ColorSelected;
 
-        // Fire when the popover opens/closes
+        public event EventHandler<string>? ColorSelected;
         public event EventHandler? PopoverOpened;
         public event EventHandler? PopoverClosed;
+
+        // Tracks whether the current SelectedColor came from dragging in the
+        // custom picker (vs clicking a preset swatch) — only custom-picked
+        // colors get added to Recently Picked when the popover closes
+        private bool colorCameFromCustomPicker;
 
         public ColorPickerButton()
         {
             InitializeComponent();
         }
 
+
         private void ToggleButton_Click(object sender, RoutedEventArgs e)
         {
             ColorPopup.IsOpen = !ColorPopup.IsOpen;
         }
 
-        // Manually calculates the popup's true screen position using
-        // PointToScreen, which correctly accounts for any RenderTransform
-        // on ancestors (unlike Popup's automatic Placement modes)
         private void ColorPopup_Opened(object sender, EventArgs e)
         {
-            Point screenPoint = ToggleButton.PointToScreen(
-                new Point(ToggleButton.ActualWidth + 8, 0));
-
+            Point screenPoint = ToggleButton.PointToScreen(new Point(ToggleButton.ActualWidth + 8, 0));
             ColorPopup.HorizontalOffset = screenPoint.X;
             ColorPopup.VerticalOffset = screenPoint.Y;
 
             InnerColorPicker.LoadColor(SelectedColor);
+            colorCameFromCustomPicker = false;
             PopoverOpened?.Invoke(this, EventArgs.Empty);
         }
 
+
         private void ColorPopup_Closed(object sender, EventArgs e)
         {
+            if (colorCameFromCustomPicker && Palette is ViewModel.ColorPaletteViewModel palette)
+                palette.RecordRecentlyPicked(SelectedColor);
+
             PopoverClosed?.Invoke(this, EventArgs.Empty);
         }
+
 
         private void InnerColorPicker_ColorSelected(object? sender, string hex)
         {
             SelectedColor = hex;
+            colorCameFromCustomPicker = true;
             ColorSelected?.Invoke(this, hex);
         }
 
-        // Lets external code (like an Escape key handler) force the popover closed
+
+        // A palette swatch was clicked — apply it immediately, sync the
+        // custom picker's visuals to match, but don't mark it as "from custom
+        // picker" since it's already sitting in a palette row
+        private void PaletteRows_SwatchClicked(object? sender, (string Hex, string Row) e)
+        {
+            SelectedColor = e.Hex;
+            InnerColorPicker.LoadColor(e.Hex);
+            colorCameFromCustomPicker = false;
+            ColorSelected?.Invoke(this, e.Hex);
+        }
+
         public void ClosePopover() => ColorPopup.IsOpen = false;
     }
 }
