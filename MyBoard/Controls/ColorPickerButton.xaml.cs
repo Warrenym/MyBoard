@@ -62,6 +62,11 @@ namespace MyBoard.Controls
             ColorPopup.IsOpen = !ColorPopup.IsOpen;
         }
 
+
+        private ViewModel.ColorPaletteViewModel? cachedPalette;
+        private string? colorToRecord;
+
+
         private void ColorPopup_Opened(object sender, EventArgs e)
         {
             Point screenPoint = ToggleButton.PointToScreen(new Point(ToggleButton.ActualWidth + 8, 0));
@@ -70,30 +75,28 @@ namespace MyBoard.Controls
 
             InnerColorPicker.LoadColor(SelectedColor);
             colorCameFromCustomPicker = false;
+
+            cachedPalette = Palette as ViewModel.ColorPaletteViewModel;
+
             PopoverOpened?.Invoke(this, EventArgs.Empty);
         }
 
-
         private void ColorPopup_Closed(object sender, EventArgs e)
         {
-            if (colorCameFromCustomPicker && Palette is ViewModel.ColorPaletteViewModel palette)
-                palette.RecordRecentlyPicked(SelectedColor);
+            if (colorCameFromCustomPicker && colorToRecord != null && cachedPalette != null)
+                cachedPalette.RecordRecentlyPicked(colorToRecord);
 
             PopoverClosed?.Invoke(this, EventArgs.Empty);
         }
-
 
         private void InnerColorPicker_ColorSelected(object? sender, string hex)
         {
             SelectedColor = hex;
             colorCameFromCustomPicker = true;
+            colorToRecord = hex; // Cache the actual dragged color too, for the same reason
             ColorSelected?.Invoke(this, hex);
         }
 
-
-        // A palette swatch was clicked — apply it immediately, sync the
-        // custom picker's visuals to match, but don't mark it as "from custom
-        // picker" since it's already sitting in a palette row
         private void PaletteRows_SwatchClicked(object? sender, (string Hex, string Row) e)
         {
             SelectedColor = e.Hex;

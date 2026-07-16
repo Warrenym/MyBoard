@@ -32,9 +32,9 @@
                         CornerRadius="8" Padding="14" Effect="{StaticResource SoftShadow}">
                     <StackPanel>
                         <controls:ColorPaletteRows x:Name="PaletteRows"
-                                                    DataContext="{Binding Palette, ElementName=Root}"
-                                                    SwatchClicked="PaletteRows_SwatchClicked"/>
-                        <Border Height="1" Background="#EEEEEE" Margin="0,10"/>
+                                                   DataContext="{Binding Palette, ElementName=Root}"
+                                                   CurrentColor="{Binding SelectedColor, ElementName=Root}"
+                                                   SwatchClicked="PaletteRows_SwatchClicked"/>
                         <controls:ColorPickerControl x:Name="InnerColorPicker" ColorSelected="InnerColorPicker_ColorSelected"/>
                     </StackPanel>
                 </Border>

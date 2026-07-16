@@ -84,14 +84,18 @@ namespace MyBoard.ViewModel
         // the UI's drag-and-drop handler (step 5) will call this and let it decide what's allowed, rather than duplicating the rule-checking in the View.
         public bool TryMoveColor(string hex, PaletteRow from, PaletteRow to)
         {
-            // Default -> Recent is the one explicitly disallowed move
-            if (from == PaletteRow.Default && to == PaletteRow.Recent)
+            // Default is permanently fixed — nothing can ever be dropped into it
+            if (to == PaletteRow.Default)
                 return false;
 
-            // Moving OUT of Default doesn't remove it from Default (it's fixed), but moving INTO Default or Saved from elsewhere should add it there
+            // Nothing can be demoted into Recently Picked from a curated row
+            if (to == PaletteRow.Recent && from != PaletteRow.Recent)
+                return false;
+
             if (to == PaletteRow.Saved && !SavedColors.Contains(hex))
                 SavedColors.Add(hex);
 
+            // Only remove from the source if it's actually being MOVED (not copied from Default)
             if (from == PaletteRow.Saved && to != PaletteRow.Saved)
                 SavedColors.Remove(hex);
 
@@ -100,6 +104,18 @@ namespace MyBoard.ViewModel
 
             Persist();
             return true;
+        }
+
+
+        // Reorders a color within the same row — moves it to a specific index rather than removing/re-adding at the end
+        public void ReorderWithinRow(PaletteRow row, string hex, int newIndex)
+        {
+            var collection = row == PaletteRow.Saved ? SavedColors : RecentlyPicked;
+            int oldIndex = collection.IndexOf(hex);
+            if (oldIndex == -1 || oldIndex == newIndex) return;
+
+            collection.Move(oldIndex, Math.Clamp(newIndex, 0, collection.Count - 1));
+            Persist();
         }
 
 

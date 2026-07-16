@@ -26,6 +26,8 @@ namespace MyBoard
                     SlideSidebarPanel(viewModel.CurrentBoard.PrimarySelectedItem != null);
             };
 
+            System.Diagnostics.Debug.WriteLine($"ColorPalette is null? {viewModel.ColorPalette == null}");
+
         }
 
 
