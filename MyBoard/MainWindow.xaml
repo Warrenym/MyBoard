@@ -30,24 +30,76 @@
 
         <!--Row 0: Home and Breadcrumb-->
         <DockPanel Grid.Row="0" Background="{StaticResource SidebarBrush}" Height="48">
-            <ItemsControl ItemsSource="{Binding BreadcrumbTrail}" Margin="16,0">
+            <ItemsControl ItemsSource="{Binding BreadcrumbTrail}"
+                          AlternationCount="{Binding BreadcrumbTrail.Count}"
+                          Margin="16,0">
                 <ItemsControl.ItemsPanel>
                     <ItemsPanelTemplate>
                         <StackPanel Orientation="Horizontal"/>
                     </ItemsPanelTemplate>
                 </ItemsControl.ItemsPanel>
+                
                 <ItemsControl.ItemTemplate>
                     <DataTemplate>
-                        <StackPanel Orientation="Horizontal">
-                            <TextBlock Text="{Binding Title}" Style="{StaticResource BodyText}" Cursor="Hand" VerticalAlignment="Center">
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+
+                            <!-- Small color swatch echoing this board's own color -->
+                            <Border Width="10" Height="10" CornerRadius="3" Margin="0,0,6,0"
+                                    Background="{Binding Color, Converter={StaticResource HexToBrush}}"/>
+
+                            <TextBlock Text="{Binding Title}" VerticalAlignment="Center" Margin="0,0,10,0">
+                                <TextBlock.Style>
+                                    <Style TargetType="TextBlock" BasedOn="{StaticResource BodyText}">
+                                        <Setter Property="Cursor" Value="Hand"/>
+                                        <Style.Triggers>
+                                            <Trigger Property="IsMouseOver" Value="True">
+                                                <Setter Property="Foreground" Value="{StaticResource AccentBrush}"/>
+                                            </Trigger>
+                                            <DataTrigger Value="True">
+                                                <DataTrigger.Binding>
+                                                    <MultiBinding Converter="{StaticResource IsLastItem}">
+                                                        <Binding RelativeSource="{RelativeSource AncestorType=ContentPresenter}"
+                                                                 Path="(ItemsControl.AlternationIndex)"/>
+                                                                    <Binding RelativeSource="{RelativeSource AncestorType=ItemsControl}"
+                                                                 Path="Items.Count"/>
+                                                    </MultiBinding>
+                                                </DataTrigger.Binding>
+                                                <Setter Property="FontWeight" Value="Bold"/>
+                                                <Setter Property="Foreground" Value="{StaticResource AccentBrush}"/>
+                                                <Setter Property="Cursor" Value="Arrow"/>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </TextBlock.Style>
                                 <TextBlock.InputBindings>
                                     <MouseBinding MouseAction="LeftClick"
                                                   Command="{Binding DataContext.NavigateToBreadcrumbCommand,
-                                                  RelativeSource={RelativeSource AncestorType=Window}}"
-                                                  CommandParameter="{Binding}"/>
+                                                            RelativeSource={RelativeSource AncestorType=Window}}"
+                                                  CommandParameter="{Binding}"/>    
                                 </TextBlock.InputBindings>
                             </TextBlock>
-                            <TextBlock Text=" / " Style="{StaticResource CaptionText}" VerticalAlignment="Center"/>
+
+                            <TextBlock Text="/" Foreground="{StaticResource TextSecondaryBrush}"
+                                       FontSize="12" VerticalAlignment="Center" Margin="0,0,10,0">
+                                <TextBlock.Style>
+                                    <Style TargetType="TextBlock">
+                                        <Style.Triggers>
+                                            <DataTrigger Value="True">
+                                                <DataTrigger.Binding>
+                                                    <MultiBinding Converter="{StaticResource IsLastItem}">
+                                                        <Binding RelativeSource="{RelativeSource AncestorType=ContentPresenter}"
+                                                                 Path="(ItemsControl.AlternationIndex)"/>
+                                                                    <Binding RelativeSource="{RelativeSource AncestorType=ItemsControl}"
+                                                                             Path="Items.Count"/>
+                                                    </MultiBinding>
+                                                </DataTrigger.Binding>
+                                                <Setter Property="Visibility" Value="Collapsed"/>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </TextBlock.Style>
+                            </TextBlock>
+
                         </StackPanel>
                     </DataTemplate>
                 </ItemsControl.ItemTemplate>
@@ -196,10 +248,11 @@
                                         </Grid>
                                     </Border>
 
-                                    <Thumb Width="12" Height="12"
+                                    <!-- Resize handle -->
+                                    <Thumb Style="{StaticResource ResizeThumbStyle}"
                                            HorizontalAlignment="Right" VerticalAlignment="Bottom"
-                                           Cursor="SizeNWSE" Background="Gray"
-                                           DragDelta="ResizeThumb_DragDelta"/>          
+                                           DragDelta="ResizeThumb_DragDelta"
+                                           DragCompleted="ResizeThumb_DragCompleted"/>
                                 </Grid>
 
                                 <DataTemplate.Triggers>
@@ -303,11 +356,11 @@
                                     </Border>
                                     
 
-                                    <!-- Resize handle, identical pattern to the Note template -->
-                                    <Thumb Width="12" Height="12"
+                                    <!-- Resize handle -->
+                                    <Thumb Style="{StaticResource ResizeThumbStyle}"
                                            HorizontalAlignment="Right" VerticalAlignment="Bottom"
-                                           Cursor="SizeNWSE" Background="Gray"
-                                           DragDelta="ResizeThumb_DragDelta"/>                  
+                                           DragDelta="ResizeThumb_DragDelta"
+                                           DragCompleted="ResizeThumb_DragCompleted"/>                 
                                 </Grid>
 
                                 <DataTemplate.Triggers>

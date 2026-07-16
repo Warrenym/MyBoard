@@ -1,5 +1,6 @@
 ﻿using MyBoard.Services;
 using MyBoard.ViewModel;
+using MyBoard.Commands;
 using System.Text.RegularExpressions;
 using System.Windows;
 using System.Windows.Controls.Primitives;
@@ -113,14 +114,52 @@ namespace MyBoard
             e.Handled = true;
         }
 
+
+        private double resizeStartWidth;
+        private double resizeStartHeight;
+        private IResizable? resizingItem;
         private void ResizeThumb_DragDelta(object sender, DragDeltaEventArgs e)
         {
             if (sender is not Thumb thumb) return;
             if (thumb.DataContext is not IResizable resizable) return;
 
+            // First delta of a new resize — capture the starting size once
+            if (resizingItem != resizable)
+            {
+                resizingItem = resizable;
+                resizeStartWidth = resizable.Width;
+                resizeStartHeight = resizable.Height;
+            }
+
+            // Images resize proportionally
+            if (thumb.DataContext is ImageItemViewModel image && image.AspectRatio > 0)
+            {
+                double newWidth = Math.Max(60, image.Width + e.HorizontalChange);
+                image.Width = newWidth;
+                image.Height = newWidth / image.AspectRatio;
+                return;
+            }
+
             resizable.Width = Math.Max(60, resizable.Width + e.HorizontalChange);
             resizable.Height = Math.Max(40, resizable.Height + e.VerticalChange);
         }
+
+
+        // Records the completed resize as a single undo step, once the drag ends
+        private void ResizeThumb_DragCompleted(object sender, DragCompletedEventArgs e)
+        {
+            if (resizingItem == null) return;
+            if ((MainViewModel)DataContext is not MainViewModel viewModel) return;
+
+            if (resizingItem.Width != resizeStartWidth || resizingItem.Height != resizeStartHeight)
+            {
+                viewModel.UndoRedo.Record(new ResizeItemCommand(
+                    resizingItem, resizeStartWidth, resizeStartHeight, resizingItem.Width, resizingItem.Height));
+            }
+
+            resizingItem = null;
+        }
+
 
         private void MainWindow_PreviewKeyDown_Pan(object sender, KeyEventArgs e)
         {
@@ -130,6 +169,7 @@ namespace MyBoard
                 Mouse.OverrideCursor = Cursors.Hand;
             }
         }
+
 
         private void MainWindow_PreviewKeyUp_Pan(object sender, KeyEventArgs e)
         {

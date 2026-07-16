@@ -20,14 +20,37 @@ namespace MyBoard
             Deactivated += MainWindow_Deactivated;
 
             var viewModel = (MainViewModel)DataContext;
-            viewModel.CurrentBoard.PropertyChanged += (s, e) =>
+
+            // Subscribe to the initial board's selection changes
+            SubscribeToBoardSelection(viewModel.CurrentBoard);
+
+            // Whenever CurrentBoard changes (navigating in/out of any board), re-subscribe to the NEW board's selection changes
+            viewModel.PropertyChanged += (s, e) =>
             {
-                if (e.PropertyName == nameof(BoardViewModel.PrimarySelectedItem))
-                    SlideSidebarPanel(viewModel.CurrentBoard.PrimarySelectedItem != null);
+                if (e.PropertyName == nameof(MainViewModel.CurrentBoard))
+                {
+                    SubscribeToBoardSelection(viewModel.CurrentBoard);
+                    SlideSidebarPanel(false);
+                }
             };
+        }
 
-            System.Diagnostics.Debug.WriteLine($"ColorPalette is null? {viewModel.ColorPalette == null}");
+        // Tracks which board is currently listening to, to unsubscribe cleanly before attaching to a new one 
+        private BoardViewModel? subscribedBoard;
 
+        private void SubscribeToBoardSelection(BoardViewModel board)
+        {
+            if (subscribedBoard != null)
+                subscribedBoard.PropertyChanged -= Board_PropertyChanged;
+
+            subscribedBoard = board;
+            subscribedBoard.PropertyChanged += Board_PropertyChanged;
+        }
+
+        private void Board_PropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+        {
+            if (e.PropertyName == nameof(BoardViewModel.PrimarySelectedItem) && sender is BoardViewModel board)
+                SlideSidebarPanel(board.PrimarySelectedItem != null);
         }
 
 

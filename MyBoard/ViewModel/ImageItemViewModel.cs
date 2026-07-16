@@ -28,6 +28,9 @@ namespace MyBoard.ViewModel
         private string filePath;
 
         [ObservableProperty]
+        private double aspectRatio;
+
+        [ObservableProperty]
         private bool isSelected;
 
         public ImageItemViewModel(ImageItem model)
@@ -38,6 +41,7 @@ namespace MyBoard.ViewModel
             width = model.Width;
             height = model.Height;
             filePath = model.FilePath;
+            aspectRatio = model.AspectRatio;
         }
 
         partial void OnXChanged(double value) => Model.X = value;

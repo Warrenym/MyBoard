@@ -12,5 +12,8 @@ namespace MyBoard.Model
         public double Width { get; set; } = 180;
         public double Height { get; set; } = 200;
         public string FilePath { get; set; } = "";
+
+        // The image's natural width/height ratio
+        public double AspectRatio { get; set; } = 1.0;
     }
 }

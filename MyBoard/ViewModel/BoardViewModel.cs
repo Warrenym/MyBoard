@@ -128,10 +128,46 @@ namespace MyBoard.ViewModel
         // Creates a new ImageItem at the given position — used by drag-and-drop.
         public void AddImage(string filePath, double x, double y)
         {
-            var image = new ImageItem { FilePath = filePath, X = x, Y = y };
+            // Start at a reasonable base width, with height derived to match the image's real proportions
+            const double defaultWidth = 200;
+            double aspectRatio = GetImageAspectRatio(filePath);
+
+            var image = new ImageItem
+            {
+                FilePath = filePath,
+                X = x,
+                Y = y,
+                AspectRatio = aspectRatio,
+                Width = defaultWidth,
+                Height = defaultWidth / aspectRatio
+            };
+
             var vm = new ImageItemViewModel(image);
             undoRedo.Do(new AddItemCommand(Model.Items, Items, image, vm));
         }
+
+
+        // Reads an image file's natural pixel dimensions
+        private static double GetImageAspectRatio(string filePath)
+        {
+            try
+            {
+                var bitmap = new System.Windows.Media.Imaging.BitmapImage();
+                bitmap.BeginInit();
+                bitmap.UriSource = new Uri(filePath);
+                bitmap.CacheOption = System.Windows.Media.Imaging.BitmapCacheOption.None;
+                
+                bitmap.EndInit();
+
+                // PixelWidth/Height are unaffected by DecodePixelWidth — they reflect the real source size
+                return (double)bitmap.PixelWidth / bitmap.PixelHeight;
+            }
+            catch
+            {
+                return 1.0; // Fallback to square if the file can't be read for any reason
+            }
+        }
+
 
 
         // Tracks every currently selected item on this board (supports multi-select).
