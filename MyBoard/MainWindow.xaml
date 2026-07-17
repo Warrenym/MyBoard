@@ -109,7 +109,7 @@
         <!-- Row 1: Undo/Redo (left) + Board Title (center) -->
         <Grid Grid.Row="1" Margin="0,10">
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Left" Margin="16,0">
-                <Button Content="↶ Undo"
+                <Button Content="↶"
                         Command="{Binding UndoCommand}"
                         IsEnabled="{Binding UndoRedo.CanUndo}">     
                     <Button.Style>
@@ -124,7 +124,7 @@
                     </Button.Style>
                 </Button>
 
-                <Button Content="↷ Redo" 
+                <Button Content="↷" 
                         Command="{Binding RedoCommand}" 
                         IsEnabled="{Binding UndoRedo.CanRedo}"
                         Margin="8,0,0,0">
@@ -230,21 +230,47 @@
 
                                         <Grid>
                                             <!-- Display mode: read-only, lets clicks fall through to selection/drag -->
-                                            <TextBlock x:Name="DisplayText"
-                                                       Text="{Binding Content}"
-                                                       TextWrapping="Wrap"
-                                                       Style="{StaticResource BodyText}"/>      
+                                            <!-- Placeholder text, shown only when the document is empty and not being edited -->
+                                            <TextBlock Text="Type something..."
+                                                       Foreground="{StaticResource TextSecondaryBrush}"
+                                                       IsHitTestVisible="False">
+                                                <TextBlock.Style>
+                                                    <Style TargetType="TextBlock" BasedOn="{StaticResource BodyText}">
+                                                        <Setter Property="Visibility" Value="Collapsed"/>
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding ShowPlaceholder}" Value="True">
+                                                                <Setter Property="Visibility" Value="Visible"/>
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </TextBlock.Style>
+                                            </TextBlock>
 
                                             <!-- Edit mode: real TextBox, only shown while IsEditing is true -->
-                                            <TextBox x:Name="EditBox"
-                                                     Text="{Binding Content, UpdateSourceTrigger=PropertyChanged}"
-                                                     TextWrapping="Wrap"
-                                                     BorderThickness="0" Background="Transparent"
-                                                     FontFamily="{StaticResource PrimaryFont}" FontSize="13"
-                                                     Visibility="Collapsed"
-                                                     LostFocus="NoteEditBox_LostFocus"
-                                                     IsVisibleChanged="NoteEditBox_IsVisibleChanged"
-                                                     PreviewKeyDown="NoteEditBox_PreviewKeyDown"/>
+                                            <RichTextBox x:Name="NoteRichTextBox"
+                                                         BorderThickness="0" Background="Transparent"
+                                                         FontFamily="{StaticResource PrimaryFont}" FontSize="13"
+                                                         VerticalScrollBarVisibility="Auto"
+                                                         IsReadOnly="{Binding IsEditing, Converter={StaticResource InverseBool}}"
+                                                         Focusable="{Binding IsEditing}"
+                                                         Loaded="NoteRichTextBox_Loaded"
+                                                         PreviewKeyDown="NoteRichTextBox_PreviewKeyDown"
+                                                         PreviewTextInput="NoteRichTextBox_PreviewTextInput"
+                                                         SelectionChanged="NoteRichTextBox_SelectionChanged">
+                                                <RichTextBox.Style>
+                                                    <Style TargetType="RichTextBox">
+                                                        <Setter Property="Visibility" Value="Visible"/>
+                                                        <Style.Triggers>
+                                                            <!-- Hidden whenever the placeholder is showing — prevents
+                                                                 an empty-but-styled block (quote marks, code background)
+                                                                 from rendering underneath the placeholder text -->
+                                                            <DataTrigger Binding="{Binding ShowPlaceholder}" Value="True">
+                                                                <Setter Property="Visibility" Value="Collapsed"/>
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </RichTextBox.Style>
+                                            </RichTextBox>
                                         </Grid>
                                     </Border>
 
@@ -257,14 +283,12 @@
 
                                 <DataTemplate.Triggers>
                                     <DataTrigger Binding="{Binding IsSelected}" Value="True">
-                                        <Setter TargetName="NoteBorder" Property="BorderBrush" Value="{StaticResource AccentBrush}"/>
+                                        <Setter TargetName="NoteBorder" 
+                                                Property="BorderBrush" 
+                                                Value="{StaticResource AccentBrush}"/>
                                     </DataTrigger>
 
-                                    <!-- Swaps to edit mode: hide the display text, show the real TextBox -->
-                                    <DataTrigger Binding="{Binding IsEditing}" Value="True">
-                                        <Setter TargetName="DisplayText" Property="Visibility" Value="Collapsed"/>
-                                        <Setter TargetName="EditBox" Property="Visibility" Value="Visible"/>
-                                    </DataTrigger>
+                                    
                                 </DataTemplate.Triggers>
                             </DataTemplate>
 
@@ -496,7 +520,12 @@
                                          vm:ImageItemViewModel would go here, reusing the same
                                          ColorPickerButton control if/when those get color options -->
                                     <DataTemplate DataType="{x:Type vm:NoteItemViewModel}">
-                                        <Grid/>
+                                        <StackPanel>
+                                            <controls:TextStylePicker x:Name="NoteTextStyleTool"
+                                                                       IsExpanded="{Binding IsSidebarExpanded, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                                       PopoverOpened="NoteDesignTool_PopoverOpened"
+                                                                       PopoverClosed="NoteDesignTool_PopoverClosed"/>       
+                                        </StackPanel>
                                     </DataTemplate>
 
                                     <DataTemplate DataType="{x:Type vm:ImageItemViewModel}">

@@ -4,6 +4,7 @@
              xmlns:local="clr-namespace:MyBoard"
              xmlns:converters="clr-namespace:MyBoard.Converters"
              StartupUri="MainWindow.xaml">
+    
     <Application.Resources>
         <ResourceDictionary>
             <ResourceDictionary.MergedDictionaries>
@@ -15,6 +16,8 @@
             <converters:HexToBrushConverter x:Key="HexToBrush"/>
             <converters:NullToVisibilityConverter x:Key="NullToVisibilityConverter"/>
             <converters:IsLastItemConverter x:Key="IsLastItem"/>
+            <converters:InverseBoolConverter x:Key="InverseBool"/>
         </ResourceDictionary>
     </Application.Resources>
+    
 </Application>

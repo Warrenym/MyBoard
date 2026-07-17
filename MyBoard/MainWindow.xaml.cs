@@ -111,7 +111,10 @@ namespace MyBoard
             while (child != null)
             {
                 if (child == ancestor) return true;
-                child = System.Windows.Media.VisualTreeHelper.GetParent(child);
+
+                child = child is System.Windows.Media.Visual || child is System.Windows.Media.Media3D.Visual3D
+                    ? System.Windows.Media.VisualTreeHelper.GetParent(child)
+                    : LogicalTreeHelper.GetParent(child);
             }
             return false;
         }
@@ -121,26 +124,26 @@ namespace MyBoard
         // note or board title if the click landed outside it
         private void RootGrid_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
         {
-            if (Keyboard.FocusedElement is not TextBox editBox) return;
-
-            if (editBox.DataContext is NoteItemViewModel note && note.IsEditing)
+            if (Keyboard.FocusedElement is RichTextBox noteBox && noteBox.DataContext is NoteItemViewModel note && note.IsEditing)
             {
-                if (!IsDescendantOf(e.OriginalSource as DependencyObject, editBox))
+                if (!IsDescendantOf(e.OriginalSource as DependencyObject, noteBox))
                 {
                     note.IsEditing = false;
                     Keyboard.Focus(RootGrid);
                 }
             }
-            else if (editBox.DataContext is BoardViewModel board && board.IsEditingTitle)
+            else if (Keyboard.FocusedElement is TextBox editBox)
             {
-                if (!IsDescendantOf(e.OriginalSource as DependencyObject, editBox))
+                if (editBox.DataContext is BoardViewModel board && board.IsEditingTitle)
                 {
-                    board.CommitTitle();
-                    Keyboard.Focus(RootGrid);
+                    if (!IsDescendantOf(e.OriginalSource as DependencyObject, editBox))
+                    {
+                        board.CommitTitle();
+                        Keyboard.Focus(RootGrid);
+                    }
                 }
             }
         }
-
 
         // Prevents buttons from retaining focus and hijacking the Space key
         private void RootGrid_PreviewMouseLeftButtonUp(object sender, MouseButtonEventArgs e)

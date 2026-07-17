@@ -201,4 +201,25 @@
             </Setter.Value>
         </Setter>
     </Style>
+
+
+    <!-- ================= TEXT STYLER ================= -->
+    <Style x:Key="TextStyleOptionStyle" TargetType="RadioButton">
+        <Setter Property="Padding" Value="8,6"/>
+        <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="RadioButton">
+                    <Border x:Name="OptionBorder" CornerRadius="6" Background="Transparent">
+                        <ContentPresenter Margin="{TemplateBinding Padding}"/>
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="OptionBorder" Property="Background" Value="#F0EEFB"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
 </ResourceDictionary>

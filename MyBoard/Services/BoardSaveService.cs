@@ -34,7 +34,38 @@ namespace MyBoard.Services
                 return null;
 
             string json = File.ReadAllText(SaveFilePath);
-            return JsonSerializer.Deserialize<Board>(json, Options);
+            var board = JsonSerializer.Deserialize<Board>(json, Options);
+
+            if (board != null)
+                MigrateLegacyNotes(board);
+
+            return board;
+        }
+
+        private static void MigrateLegacyNotes(Board board)
+        {
+            foreach (var item in board.Items)
+            {
+                if (item is NoteItem note && !string.IsNullOrEmpty(note.Content) &&
+                    (note.Document.Blocks.Count == 0 ||
+                     note.Document.Blocks.All(b => b.Runs.Count == 0)))
+                {
+                    note.Document = new NoteDocument
+                    {
+                        Blocks = new List<NoteBlock>
+                {
+                    new NoteBlock
+                    {
+                        Type = NoteBlockType.Normal,
+                        Runs = new List<NoteRun> { new NoteRun { Text = note.Content } }
+                    }
+                }
+                    };
+                }
+
+                if (item is Board childBoard)
+                    MigrateLegacyNotes(childBoard); // recurse into nested boards
+            }
         }
     } 
 }
