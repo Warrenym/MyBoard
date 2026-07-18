@@ -1,5 +1,4 @@
 ﻿using MyBoard.Model;
-using MyBoard.Model;
 using System.Windows;
 using System.Windows.Controls;
 
@@ -23,21 +22,49 @@ namespace MyBoard.Controls
 
         public event EventHandler? PopoverOpened;
         public event EventHandler? PopoverClosed;
+        public void ClosePopover()
+        {
+            System.Diagnostics.Debug.WriteLine("ClosePopover called. Stack trace:\n" + Environment.StackTrace);
+            StylePopup.IsOpen = false;
+        }
+
 
         public TextStylePicker()
         {
             InitializeComponent();
             StylePopup.Closed += (s, e) => PopoverClosed?.Invoke(this, EventArgs.Empty);
+
+            Loaded += (_, _) =>
+                System.Diagnostics.Debug.WriteLine("TextStylePicker Loaded");
+
+            Unloaded += (_, _) =>
+                System.Diagnostics.Debug.WriteLine("TextStylePicker Unloaded");
+
+            StylePopup.Opened += (s, e) =>
+                System.Diagnostics.Debug.WriteLine("Popup Opened");
+
+            StylePopup.Closed += (s, e) =>
+                System.Diagnostics.Debug.WriteLine("Popup Closed");
         }
 
 
-        private void ToggleButton_Click(object sender, RoutedEventArgs e) => StylePopup.IsOpen = !StylePopup.IsOpen;
+        public event EventHandler? AboutToOpen;
+
+        private void ToggleButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (!StylePopup.IsOpen)
+                AboutToOpen?.Invoke(this, EventArgs.Empty);
+
+            StylePopup.IsOpen = !StylePopup.IsOpen;
+        }
+
+
+        public Point AnchorScreenPoint { get; set; }
 
         private void StylePopup_Opened(object sender, EventArgs e)
         {
-            Point screenPoint = ToggleButton.PointToScreen(new Point(ToggleButton.ActualWidth + 8, 0));
-            StylePopup.HorizontalOffset = screenPoint.X;
-            StylePopup.VerticalOffset = screenPoint.Y;
+            StylePopup.HorizontalOffset = AnchorScreenPoint.X;
+            StylePopup.VerticalOffset = AnchorScreenPoint.Y;
             PopoverOpened?.Invoke(this, EventArgs.Empty);
         }
 
@@ -58,7 +85,6 @@ namespace MyBoard.Controls
                 note.Document = Services.NoteDocumentConverter.ToNoteDocument(TargetRichTextBox.Document);
 
             TargetRichTextBox.Focus();
-            StylePopup.IsOpen = false;
         }
     }
 }

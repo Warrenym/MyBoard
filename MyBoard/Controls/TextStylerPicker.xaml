@@ -13,7 +13,7 @@
         </Button>
 
         <Popup x:Name="StylePopup" Placement="Absolute" AllowsTransparency="True"
-               StaysOpen="False" PopupAnimation="Fade" Opened="StylePopup_Opened">
+               StaysOpen="True" PopupAnimation="Fade" Opened="StylePopup_Opened">
             <Border Background="{StaticResource SidebarBrush}" CornerRadius="8" Padding="8"
                     Effect="{StaticResource SoftShadow}" Width="180">
                 <StackPanel>

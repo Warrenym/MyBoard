@@ -26,9 +26,10 @@ namespace MyBoard.Services
         }
 
 
+        public static readonly Thickness ParagraphSpacing = new(0, 0, 0, 4);
         private static Paragraph BuildParagraph(NoteBlock block)
         {
-            var paragraph = new Paragraph { Margin = new Thickness(0, 0, 0, 4) };
+            var paragraph = new Paragraph { Margin = ParagraphSpacing };
             ApplyBlockStyle(paragraph, block.Type);
 
             foreach (var run in block.Runs)

@@ -1,4 +1,5 @@
 ﻿using MyBoard.ViewModel;
+using System.ComponentModel;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -47,10 +48,19 @@ namespace MyBoard
             subscribedBoard.PropertyChanged += Board_PropertyChanged;
         }
 
-        private void Board_PropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+        private void Board_PropertyChanged(object? sender, PropertyChangedEventArgs e)
         {
-            if (e.PropertyName == nameof(BoardViewModel.PrimarySelectedItem) && sender is BoardViewModel board)
+            System.Diagnostics.Debug.WriteLine(
+                $"Board_PropertyChanged: {e.PropertyName}");
+
+            if (e.PropertyName == nameof(BoardViewModel.PrimarySelectedItem)
+                && sender is BoardViewModel board)
+            {
+                System.Diagnostics.Debug.WriteLine(
+                    $"PrimarySelectedItem = {board.PrimarySelectedItem?.GetType().Name}");
+
                 SlideSidebarPanel(board.PrimarySelectedItem != null);
+            }
         }
 
 
@@ -61,7 +71,7 @@ namespace MyBoard
         // Deletes/Undo/Redo/Cut/Copy/Paste/Duplicate/Rename shortcuts, and Escape for the color popover
         private void MainWindow_PreviewKeyDown(object sender, KeyEventArgs e)
         {
-            bool isTyping = Keyboard.FocusedElement is TextBox;
+            bool isTyping = Keyboard.FocusedElement is TextBox || Keyboard.FocusedElement is RichTextBox;
             var board = ((MainViewModel)DataContext).CurrentBoard;
             var viewModel = (MainViewModel)DataContext;
 
@@ -93,7 +103,6 @@ namespace MyBoard
 
             if (e.Key == Key.Escape)
             {
-                // Only relevant if a board is currently selected and its color tool exists
                 if (((FrameworkElement)Content).FindName("BoardColorTool") is Controls.ColorPickerButton colorTool)
                     colorTool.ClosePopover();
             }
@@ -119,11 +128,40 @@ namespace MyBoard
             return false;
         }
 
+        private static bool IsLogicalDescendantOf(DependencyObject? child, DependencyObject ancestor)
+        {
+            while (child != null)
+            {
+                if (child == ancestor) return true;
+                child = LogicalTreeHelper.GetParent(child);
+            }
+            return false;
+        }
+
 
         // Runs BEFORE any other click handling (tunneling) — closes an actively-edited
         // note or board title if the click landed outside it
+
+        private static bool IsPartOfControl(DependencyObject? element, DependencyObject ancestor)
+        {
+            while (element != null)
+            {
+                if (element == ancestor) return true;
+
+                if (element is FrameworkElement fe && fe.TemplatedParent != null)
+                {
+                    element = fe.TemplatedParent;
+                    continue;
+                }
+
+                element = LogicalTreeHelper.GetParent(element);
+            }
+            return false;
+        }
+
         private void RootGrid_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
         {
+
             if (Keyboard.FocusedElement is RichTextBox noteBox && noteBox.DataContext is NoteItemViewModel note && note.IsEditing)
             {
                 if (!IsDescendantOf(e.OriginalSource as DependencyObject, noteBox))
@@ -157,13 +195,14 @@ namespace MyBoard
 
         private void Sidebar_MouseEnter(object sender, MouseEventArgs e)
         {
+            System.Diagnostics.Debug.WriteLine("Sidebar_MouseEnter");
             IsSidebarExpanded = true;
             AnimateSidebarWidth(180);
         }
 
         private void Sidebar_MouseLeave(object sender, MouseEventArgs e)
         {
-            if (!isColorPopoverOpen)
+            if (!isColorPopoverOpen) // Text Style no longer participates in this check
             {
                 IsSidebarExpanded = false;
                 AnimateSidebarWidth(60);

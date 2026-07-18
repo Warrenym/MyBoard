@@ -181,6 +181,14 @@ namespace MyBoard
             }
         }
 
+
+        [System.Runtime.InteropServices.DllImport("user32.dll")]
+        private static extern IntPtr GetForegroundWindow();
+
+        [System.Runtime.InteropServices.DllImport("user32.dll")]
+        private static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint processId);
+
+
         private void MainWindow_Deactivated(object sender, EventArgs e)
         {
             isSpaceHeld = false;
@@ -190,6 +198,22 @@ namespace MyBoard
 
             if (CanvasViewport.IsMouseCaptured)
                 CanvasViewport.ReleaseMouseCapture();
+
+            // A Popup is a separate top-level OS window, so clicking INSIDE one
+            // also fires this event — checking the process (not just the window)
+            // lets us tell "switched to a different app" apart from "clicked into
+            // our own popup," and only close popovers for the former
+            IntPtr foreground = GetForegroundWindow();
+            GetWindowThreadProcessId(foreground, out uint foregroundProcessId);
+            uint ourProcessId = (uint)System.Diagnostics.Process.GetCurrentProcess().Id;
+
+            if (foregroundProcessId != ourProcessId)
+            {
+                activeTextStylePicker?.ClosePopover();
+                if (((FrameworkElement)Content).FindName("BoardColorTool") is Controls.ColorPickerButton colorTool)
+                    colorTool.ClosePopover();
+            }
+
         }
 
         private void CanvasViewport_MouseMove(object sender, MouseEventArgs e)

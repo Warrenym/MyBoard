@@ -9,6 +9,7 @@
     xmlns:controls="clr-namespace:MyBoard.Controls"
     xmlns:converters="clr-namespace:MyBoard.Converters"
     mc:Ignorable="d"
+    WindowState="Maximized"
     Title="MainWindow" Height="450" Width="800">
 
 
@@ -325,6 +326,7 @@
                                                        FontWeight="SemiBold"
                                                        HorizontalAlignment="Center"
                                                        TextAlignment="Center"
+                                                       TextWrapping="Wrap"
                                                        MouseLeftButtonDown="BoardTitle_MouseLeftButtonDown"/>
 
                                             <TextBox x:Name="TitleEditBox"
@@ -523,6 +525,7 @@
                                         <StackPanel>
                                             <controls:TextStylePicker x:Name="NoteTextStyleTool"
                                                                        IsExpanded="{Binding IsSidebarExpanded, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                                       AboutToOpen="NoteDesignTool_AboutToOpen" 
                                                                        PopoverOpened="NoteDesignTool_PopoverOpened"
                                                                        PopoverClosed="NoteDesignTool_PopoverClosed"/>       
                                         </StackPanel>

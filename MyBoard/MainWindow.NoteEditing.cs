@@ -10,24 +10,40 @@ namespace MyBoard
 {
     public partial class MainWindow
     {
+        private Controls.TextStylePicker? activeTextStylePicker;
+
+
+        private void NoteDesignTool_AboutToOpen(object? sender, EventArgs e)
+        {
+            if (sender is not Controls.TextStylePicker picker) return;
+            if (((MainViewModel)DataContext).CurrentBoard.PrimarySelectedItem is not NoteItemViewModel note) return;
+
+            var richTextBox = FindNoteRichTextBox(note);
+            picker.TargetRichTextBox = richTextBox;
+
+            if (richTextBox != null)
+            {
+                Point topLeft = richTextBox.PointToScreen(new Point(0, 0));
+
+                // Position the popover fully outside the note, to its left and
+                // slightly above the top edge — not just nudged, but offset by
+                // the popover's own approximate width so it never overlaps the note
+                const double popoverWidth = 180;
+                const double gap = 12;
+                picker.AnchorScreenPoint = new Point(topLeft.X - popoverWidth - gap, topLeft.Y);
+            }
+        }
+
         private void NoteDesignTool_PopoverOpened(object? sender, EventArgs e)
         {
-            isColorPopoverOpen = true; // reuse the same flag — any design popover keeps the sidebar open
             IsSidebarExpanded = true;
             AnimateSidebarWidth(180);
-
-            if (sender is Controls.TextStylePicker picker &&
-                ((MainViewModel)DataContext).CurrentBoard.PrimarySelectedItem is NoteItemViewModel note)
-            {
-                // Find the currently-selected note's RichTextBox in the visual tree
-                picker.TargetRichTextBox = FindNoteRichTextBox(note);
-            }
         }
 
 
         private void NoteDesignTool_PopoverClosed(object? sender, EventArgs e)
         {
-            isColorPopoverOpen = false;
+            System.Diagnostics.Debug.WriteLine("NoteDesignTool_PopoverClosed");
             if (!Sidebar.IsMouseOver)
             {
                 IsSidebarExpanded = false;
@@ -97,16 +113,19 @@ namespace MyBoard
         private void NoteRichTextBox_PreviewKeyDown(object sender, KeyEventArgs e)
         {
             if (sender is not RichTextBox rtb) return;
-            var paragraph = rtb.CaretPosition.Paragraph;
-            if (paragraph == null) return;
-            if (Services.NoteDocumentConverter.DetectBlockTypePublic(paragraph) != Model.NoteBlockType.QuoteBlock) return;
 
+            var currentParagraph = rtb.CaretPosition.Paragraph;
+            if (currentParagraph == null) return;
 
-            if (rtb.CaretPosition.CompareTo(paragraph.ContentStart) <= 0)
-                rtb.CaretPosition = paragraph.ContentStart.GetPositionAtOffset(1) ?? paragraph.ContentStart;
-            else if (rtb.CaretPosition.CompareTo(paragraph.ContentEnd) >= 0)
-                rtb.CaretPosition = paragraph.ContentEnd.GetPositionAtOffset(-1) ?? paragraph.ContentEnd;
-
+            // Clamp the caret inside quote marks if we're in a Quote Block —
+            // runs first, before any key-specific handling below
+            if (Services.NoteDocumentConverter.DetectBlockTypePublic(currentParagraph) == Model.NoteBlockType.QuoteBlock)
+            {
+                if (rtb.CaretPosition.CompareTo(currentParagraph.ContentStart) <= 0)
+                    rtb.CaretPosition = currentParagraph.ContentStart.GetPositionAtOffset(1) ?? currentParagraph.ContentStart;
+                else if (rtb.CaretPosition.CompareTo(currentParagraph.ContentEnd) >= 0)
+                    rtb.CaretPosition = currentParagraph.ContentEnd.GetPositionAtOffset(-1) ?? currentParagraph.ContentEnd;
+            }
 
             if (e.Key == Key.Escape && rtb.DataContext is ViewModel.NoteItemViewModel note)
             {
@@ -121,26 +140,37 @@ namespace MyBoard
             if (e.Key == Key.Enter && Keyboard.Modifiers == ModifierKeys.Shift)
                 return;
 
-            // Plain Enter: if the CURRENT line isn't Normal, force the new line
-            // (which WPF is about to create) back to Normal once it exists
+            // Plain Enter: take full manual control — split the text at the caret,
+            // create a new paragraph ourselves, and style it explicitly, rather
+            // than racing WPF's own paragraph-creation timing
             if (e.Key == Key.Enter && Keyboard.Modifiers == ModifierKeys.None)
             {
-                var currentParagraph = rtb.CaretPosition.Paragraph;
-                bool wasNonNormal = currentParagraph != null &&
-                    Services.NoteDocumentConverter.DetectBlockTypePublic(currentParagraph) != Model.NoteBlockType.Normal;
+                e.Handled = true;
 
-                if (wasNonNormal)
+                var caret = rtb.CaretPosition;
+                var paragraph = caret.Paragraph;
+                if (paragraph == null) return;
+
+                var currentType = Services.NoteDocumentConverter.DetectBlockTypePublic(paragraph);
+
+                // Quote Block is excluded from the reset — Enter inside a quote just
+                // continues as another quote line, per your spec
+                var targetType = currentType == Model.NoteBlockType.QuoteBlock
+                    ? Model.NoteBlockType.QuoteBlock
+                    : Model.NoteBlockType.Normal;
+
+                var afterRange = new TextRange(caret, paragraph.ContentEnd);
+                string afterText = afterRange.Text.TrimEnd('\r', '\n');
+                afterRange.Text = "";
+
+                var newParagraph = new Paragraph(new Run(afterText))
                 {
-                    // Let WPF handle the actual Enter/new-paragraph creation first,
-                    // then reset the NEW paragraph's style on the next dispatcher tick
-                    // (the new Paragraph doesn't exist yet at the moment KeyDown fires)
-                    Dispatcher.BeginInvoke(new Action(() =>
-                    {
-                        var newParagraph = rtb.CaretPosition.Paragraph;
-                        if (newParagraph != null)
-                            Services.NoteDocumentConverter.ApplyBlockType(rtb, Model.NoteBlockType.Normal);
-                    }), System.Windows.Threading.DispatcherPriority.Input);
-                }
+                    Margin = Services.NoteDocumentConverter.ParagraphSpacing
+                };
+                rtb.Document.Blocks.InsertAfter(paragraph, newParagraph);
+
+                rtb.CaretPosition = newParagraph.ContentStart;
+                Services.NoteDocumentConverter.ApplyBlockType(rtb, targetType);
             }
         }
 
