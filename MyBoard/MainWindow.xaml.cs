@@ -50,16 +50,17 @@ namespace MyBoard
 
         private void Board_PropertyChanged(object? sender, PropertyChangedEventArgs e)
         {
-            System.Diagnostics.Debug.WriteLine(
-                $"Board_PropertyChanged: {e.PropertyName}");
-
-            if (e.PropertyName == nameof(BoardViewModel.PrimarySelectedItem)
-                && sender is BoardViewModel board)
+            if (e.PropertyName == nameof(BoardViewModel.PrimarySelectedItem) && sender is BoardViewModel board)
             {
-                System.Diagnostics.Debug.WriteLine(
-                    $"PrimarySelectedItem = {board.PrimarySelectedItem?.GetType().Name}");
-
                 SlideSidebarPanel(board.PrimarySelectedItem != null);
+
+                // Point the formatting toolbar at whichever note is now selected —
+                // fixes a bug where the LAST note to ever load on the canvas would
+                // silently stay the format target forever, regardless of what's
+                // actually selected
+                activeFormattingTarget = board.PrimarySelectedItem is NoteItemViewModel note
+                    ? FindNoteRichTextBox(note)
+                    : null;
             }
         }
 

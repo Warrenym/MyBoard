@@ -6,7 +6,8 @@
     <StackPanel>
         <Button x:Name="ToggleButton" Style="{StaticResource SidebarButtonStyle}" Click="ToggleButton_Click">
             <StackPanel Orientation="Horizontal">
-                <TextBlock Text="T" FontWeight="Bold" Width="18" TextAlignment="Center"/>
+                <TextBlock Text="T" FontWeight="Bold" FontSize="{StaticResource SidebarIconSize}" Width="30"
+                           TextAlignment="Center" VerticalAlignment="Center"/>
                 <TextBlock Text="Text style" Style="{StaticResource BodyText}" Margin="10,0,0,0"
                            Visibility="{Binding IsExpanded, ElementName=Root, Converter={StaticResource BoolToVis}}"/>
             </StackPanel>

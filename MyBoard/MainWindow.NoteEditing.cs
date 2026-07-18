@@ -86,6 +86,8 @@ namespace MyBoard
             if (rtb.DataContext is not NoteItemViewModel note) return;
 
             rtb.Document = NoteDocumentConverter.ToFlowDocument(note.Document);
+            
+            rtb.SelectionChanged += (s, args) => NoteRichTextBox_RefreshFormatState(rtb);
 
             note.PropertyChanged += (s, args) =>
             {

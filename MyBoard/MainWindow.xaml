@@ -470,8 +470,9 @@
                                 <Button Command="{Binding AddNoteCommand}"
                                         Style="{StaticResource SidebarButtonStyle}">
                                     <StackPanel Orientation="Horizontal">
-                                        <TextBlock Text="📝" Width="30"/>
-                                        <TextBlock Text="Note" 
+                                        <TextBlock Text="📝" FontSize="{StaticResource SidebarIconSize}" Width="30"
+                                                   TextAlignment="Center" VerticalAlignment="Center"/>
+                                        <TextBlock Text="Note" VerticalAlignment="Center"
                                                    Visibility="{Binding IsSidebarExpanded, 
                                                                 RelativeSource={RelativeSource AncestorType=Window}, 
                                                                 Converter={StaticResource BoolToVis}}"/>    
@@ -481,8 +482,9 @@
                                 <Button Command="{Binding AddBoardCommand}"
                                         Style="{StaticResource SidebarButtonStyle}">
                                     <StackPanel Orientation="Horizontal">
-                                        <TextBlock Text="📁" Width="30"/>
-                                        <TextBlock Text="Board"
+                                        <TextBlock Text="📁" FontSize="{StaticResource SidebarIconSize}" Width="30"
+                                                   TextAlignment="Center" VerticalAlignment="Center"/>
+                                        <TextBlock Text="Board" VerticalAlignment="Center"
                                                     Visibility="{Binding IsSidebarExpanded, 
                                                                  RelativeSource={RelativeSource AncestorType=Window}, 
                                                                  Converter={StaticResource BoolToVis}}"/>        
@@ -527,7 +529,42 @@
                                                                        IsExpanded="{Binding IsSidebarExpanded, RelativeSource={RelativeSource AncestorType=Window}}"
                                                                        AboutToOpen="NoteDesignTool_AboutToOpen" 
                                                                        PopoverOpened="NoteDesignTool_PopoverOpened"
-                                                                       PopoverClosed="NoteDesignTool_PopoverClosed"/>       
+                                                                       PopoverClosed="NoteDesignTool_PopoverClosed"/>
+                                            
+                                            <!-- Formatting row 1: character styles -->
+                                            <StackPanel Margin="8,4">
+                                                <ToggleButton x:Name="BoldToggle" HorizontalAlignment="Stretch" Style="{StaticResource FormatToggleButtonStyle}" Click="FormatToggle_Click" Loaded="FormatToggle_Loaded" Tag="Bold">
+                                                    <StackPanel Orientation="Horizontal">
+                                                        <TextBlock Text="B" FontWeight="Bold" FontSize="{StaticResource SidebarIconSize}" Width="24" TextAlignment="Center" VerticalAlignment="Center"/>
+                                                        <TextBlock Text="Bold" Style="{StaticResource BodyText}" Margin="6,0,0,0"
+                                                                   Visibility="{Binding IsSidebarExpanded, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource BoolToVis}}"/>
+                                                    </StackPanel>
+                                                </ToggleButton>
+
+                                                <ToggleButton x:Name="ItalicToggle" HorizontalAlignment="Stretch" Style="{StaticResource FormatToggleButtonStyle}" Click="FormatToggle_Click" Loaded="FormatToggle_Loaded" Tag="Italic">
+                                                    <StackPanel Orientation="Horizontal">
+                                                        <TextBlock Text="I" FontStyle="Italic" FontSize="{StaticResource SidebarIconSize}" Width="24" TextAlignment="Center" VerticalAlignment="Center"/>
+                                                        <TextBlock Text="Italic" Style="{StaticResource BodyText}" Margin="6,0,0,0"
+                                                                   Visibility="{Binding IsSidebarExpanded, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource BoolToVis}}"/>
+                                                    </StackPanel>
+                                                </ToggleButton>
+
+                                                <ToggleButton x:Name="UnderlineToggle" HorizontalAlignment="Stretch" Style="{StaticResource FormatToggleButtonStyle}" Click="FormatToggle_Click" Loaded="FormatToggle_Loaded" Tag="Underline">
+                                                    <StackPanel Orientation="Horizontal">
+                                                        <TextBlock Text="U" TextDecorations="Underline" FontSize="{StaticResource SidebarIconSize}" Width="24" TextAlignment="Center" VerticalAlignment="Center"/>
+                                                        <TextBlock Text="Underline" Style="{StaticResource BodyText}" Margin="6,0,0,0"
+                                                                   Visibility="{Binding IsSidebarExpanded, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource BoolToVis}}"/>
+                                                    </StackPanel>
+                                                </ToggleButton>
+
+                                                <ToggleButton x:Name="StrikeToggle" HorizontalAlignment="Stretch" Style="{StaticResource FormatToggleButtonStyle}" Click="FormatToggle_Click" Loaded="FormatToggle_Loaded" Tag="Strikethrough">
+                                                    <StackPanel Orientation="Horizontal">
+                                                        <TextBlock Text="S" TextDecorations="Strikethrough" FontSize="{StaticResource SidebarIconSize}" Width="24" TextAlignment="Center" VerticalAlignment="Center"/>
+                                                        <TextBlock Text="Strikethrough" Style="{StaticResource BodyText}" Margin="6,0,0,0"
+                                                                   Visibility="{Binding IsSidebarExpanded, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource BoolToVis}}"/>
+                                                    </StackPanel>
+                                                </ToggleButton>
+                                            </StackPanel>
                                         </StackPanel>
                                     </DataTemplate>
 
