@@ -22,7 +22,7 @@
     <!-- One shared size for every glyph/emoji icon in the sidebar (Note,
          Board, Text Style "T", format B/I/U/S) so they all scale together
          consistently instead of each drifting to its own ad-hoc size -->
-    <sys:Double x:Key="SidebarIconSize">16</sys:Double>
+    <sys:Double x:Key="SidebarIconSize">18</sys:Double>
 
     <SolidColorBrush x:Key="BackgroundBrush" Color="{StaticResource BackgroundColor}"/>
     <SolidColorBrush x:Key="SidebarBrush" Color="{StaticResource SidebarColor}"/>
@@ -263,5 +263,78 @@
                 </ControlTemplate>
             </Setter.Value>
         </Setter>
+    </Style>
+
+    <!-- ================= SCROLLBAR ================= -->
+    <!-- Minimal, rounded scrollbar matching the app's soft visual language,
+         replacing the default stock Windows scrollbar. Applied as an
+         IMPLICIT style (no x:Key) so every scrollable control in the app —
+         including the Note's RichTextBox, and anything scrollable added
+         later — picks this up automatically with no extra wiring needed. -->
+
+    <Style x:Key="ThemedScrollBarThumb" TargetType="Thumb">
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Thumb">
+                    <Border x:Name="ThumbBorder"
+                            Background="{StaticResource BorderBrush}"
+                            CornerRadius="4"
+                            Margin="2"/>
+                    <ControlTemplate.Triggers>
+                        <!-- Darkens toward the accent color on hover, giving
+                             feedback without adding visual weight when idle -->
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="ThumbBorder" Property="Background" Value="{StaticResource AccentBrush}"/>
+                        </Trigger>
+                        <Trigger Property="IsDragging" Value="True">
+                            <Setter TargetName="ThumbBorder" Property="Background" Value="{StaticResource AccentBrush}"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style TargetType="{x:Type ScrollBar}">
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="Width" Value="10"/>
+        <Setter Property="MinWidth" Value="10"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="{x:Type ScrollBar}">
+                    <Grid x:Name="Root" Background="{TemplateBinding Background}">
+                        <!-- Vertical layout: track fills the full height, no
+                             visible line-up/line-down arrow buttons — clicking
+                             the track above/below the thumb still pages -->
+                        <Track x:Name="PART_Track" IsDirectionReversed="True">
+                            <Track.DecreaseRepeatButton>
+                                <RepeatButton Command="ScrollBar.PageUpCommand" Opacity="0" Background="Transparent" BorderThickness="0"/>
+                            </Track.DecreaseRepeatButton>
+                            <Track.IncreaseRepeatButton>
+                                <RepeatButton Command="ScrollBar.PageDownCommand" Opacity="0" Background="Transparent" BorderThickness="0"/>
+                            </Track.IncreaseRepeatButton>
+                            <Track.Thumb>
+                                <Thumb Style="{StaticResource ThemedScrollBarThumb}"/>
+                            </Track.Thumb>
+                        </Track>
+                    </Grid>
+                    <ControlTemplate.Triggers>
+                        <!-- Horizontal scrollbars use the same visual language,
+                             just rotated — width/height swap accordingly -->
+                        <Trigger Property="Orientation" Value="Horizontal">
+                            <Setter TargetName="PART_Track" Property="IsDirectionReversed" Value="False"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+        <Style.Triggers>
+            <Trigger Property="Orientation" Value="Horizontal">
+                <Setter Property="Width" Value="Auto"/>
+                <Setter Property="MinWidth" Value="0"/>
+                <Setter Property="Height" Value="10"/>
+                <Setter Property="MinHeight" Value="10"/>
+            </Trigger>
+        </Style.Triggers>
     </Style>
 </ResourceDictionary>

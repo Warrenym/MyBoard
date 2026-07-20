@@ -4,11 +4,14 @@ using System.Windows.Controls;
 
 namespace MyBoard.Controls
 {
+
     public partial class TextStylePicker : UserControl
     {
         public static readonly DependencyProperty IsExpandedProperty =
             DependencyProperty.Register(nameof(IsExpanded), typeof(bool), typeof(TextStylePicker),
                 new PropertyMetadata(false));
+        
+
         public bool IsExpanded
         {
             get => (bool)GetValue(IsExpandedProperty);
@@ -22,9 +25,24 @@ namespace MyBoard.Controls
 
         public event EventHandler? PopoverOpened;
         public event EventHandler? PopoverClosed;
+
+
+        [System.Runtime.InteropServices.DllImport("user32.dll")]
+        private static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
+
+        private const int SW_HIDE = 0;
+
+
         public void ClosePopover()
         {
-            System.Diagnostics.Debug.WriteLine("ClosePopover called. Stack trace:\n" + Environment.StackTrace);
+            if (!StylePopup.IsOpen) return;
+
+            // Belt-and-suspenders: setting IsOpen=false alone hasn't reliably hidden
+            // the popup's underlying window during an app-switch transition, so we
+            // also force it closed directly at the OS level as a guarantee
+            if (System.Windows.PresentationSource.FromVisual(StylePopup.Child) is System.Windows.Interop.HwndSource hwndSource)
+                ShowWindow(hwndSource.Handle, SW_HIDE);
+
             StylePopup.IsOpen = false;
         }
 

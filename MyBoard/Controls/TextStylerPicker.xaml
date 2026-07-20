@@ -8,7 +8,7 @@
             <StackPanel Orientation="Horizontal">
                 <TextBlock Text="T" FontWeight="Bold" FontSize="{StaticResource SidebarIconSize}" Width="30"
                            TextAlignment="Center" VerticalAlignment="Center"/>
-                <TextBlock Text="Text style" Style="{StaticResource BodyText}" Margin="10,0,0,0"
+                <TextBlock Text="Text style" Style="{StaticResource BodyText}" Margin="10,0,0,0" VerticalAlignment="Center"
                            Visibility="{Binding IsExpanded, ElementName=Root, Converter={StaticResource BoolToVis}}"/>
             </StackPanel>
         </Button>

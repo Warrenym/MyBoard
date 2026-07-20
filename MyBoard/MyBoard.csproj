@@ -1,35 +1,38 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
-  <PropertyGroup>
-    <OutputType>WinExe</OutputType>
-    <TargetFramework>net10.0-windows</TargetFramework>
-    <Nullable>enable</Nullable>
-    <ImplicitUsings>enable</ImplicitUsings>
-    <UseWPF>true</UseWPF>
-  </PropertyGroup>
+	<PropertyGroup>
+		<OutputType>WinExe</OutputType>
+		<TargetFramework>net10.0-windows</TargetFramework>
+		<Nullable>enable</Nullable>
+		<ImplicitUsings>enable</ImplicitUsings>
+		<UseWPF>true</UseWPF>
+		<ApplicationIcon>Assets\MyBoardLogo.ico</ApplicationIcon>
+	</PropertyGroup>
 
-  <ItemGroup>
-    <None Remove="Assets\closedHand.cur" />
-    <None Remove="Assets\Fonts\Nunito-Bold.ttf" />
-    <None Remove="Assets\Fonts\Nunito-Regular.ttf" />
-    <None Remove="Assets\Fonts\Nunito-SemiBold.ttf" />
-    <None Remove="Assets\Fonts\Quicksand-Bold.ttf" />
-    <None Remove="Assets\Fonts\Quicksand-SemiBold.ttf" />
-    <None Remove="Assets\openHand.cur" />
-  </ItemGroup>
+	<ItemGroup>
+		<None Remove="Assets\closedHand.cur" />
+		<None Remove="Assets\Fonts\Nunito-Bold.ttf" />
+		<None Remove="Assets\Fonts\Nunito-Regular.ttf" />
+		<None Remove="Assets\Fonts\Nunito-SemiBold.ttf" />
+		<None Remove="Assets\Fonts\Quicksand-Bold.ttf" />
+		<None Remove="Assets\Fonts\Quicksand-SemiBold.ttf" />
+		<None Remove="Assets\MyBoardLogo.ico" />
+		<None Remove="Assets\openHand.cur" />
+	</ItemGroup>
 
-  <ItemGroup>
-    <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2" />
-  </ItemGroup>
+	<ItemGroup>
+		<PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2" />
+	</ItemGroup>
 
-  <ItemGroup>
-    <Resource Include="Assets\closedHand.cur" />
-    <Resource Include="Assets\Fonts\Nunito-Bold.ttf" />
-    <Resource Include="Assets\Fonts\Nunito-Regular.ttf" />
-    <Resource Include="Assets\Fonts\Nunito-SemiBold.ttf" />
-    <Resource Include="Assets\Fonts\Quicksand-Bold.ttf" />
-    <Resource Include="Assets\Fonts\Quicksand-SemiBold.ttf" />
-    <Resource Include="Assets\openHand.cur" />
-  </ItemGroup>
+	<ItemGroup>
+		<Resource Include="Assets\closedHand.cur" />
+		<Resource Include="Assets\Fonts\Nunito-Bold.ttf" />
+		<Resource Include="Assets\Fonts\Nunito-Regular.ttf" />
+		<Resource Include="Assets\Fonts\Nunito-SemiBold.ttf" />
+		<Resource Include="Assets\Fonts\Quicksand-Bold.ttf" />
+		<Resource Include="Assets\Fonts\Quicksand-SemiBold.ttf" />
+		<Resource Include="Assets\MyBoardLogo.ico" />
+		<Resource Include="Assets\openHand.cur" />
+	</ItemGroup>
 
 </Project>

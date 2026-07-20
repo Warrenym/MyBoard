@@ -14,19 +14,22 @@
 
 
     <Window.Resources>
-        
+
     </Window.Resources>
-        
-        
+
+
     <!--Grid Definitions-->
     <Grid x:Name="RootGrid"
           Focusable="True"
           PreviewMouseLeftButtonDown="RootGrid_PreviewMouseLeftButtonDown"
           MouseLeftButtonUp="RootGrid_PreviewMouseLeftButtonUp">
         <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"/> <!--breadcrumb-->
-            <RowDefinition Height="Auto"/> <!--board title-->
-            <RowDefinition Height="*"/> <!--main content-->
+            <RowDefinition Height="Auto"/>
+            <!--breadcrumb-->
+            <RowDefinition Height="Auto"/>
+            <!--board title-->
+            <RowDefinition Height="*"/>
+            <!--main content-->
         </Grid.RowDefinitions>
 
         <!--Row 0: Home and Breadcrumb-->
@@ -39,7 +42,7 @@
                         <StackPanel Orientation="Horizontal"/>
                     </ItemsPanelTemplate>
                 </ItemsControl.ItemsPanel>
-                
+
                 <ItemsControl.ItemTemplate>
                     <DataTemplate>
                         <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
@@ -61,7 +64,7 @@
                                                     <MultiBinding Converter="{StaticResource IsLastItem}">
                                                         <Binding RelativeSource="{RelativeSource AncestorType=ContentPresenter}"
                                                                  Path="(ItemsControl.AlternationIndex)"/>
-                                                                    <Binding RelativeSource="{RelativeSource AncestorType=ItemsControl}"
+                                                        <Binding RelativeSource="{RelativeSource AncestorType=ItemsControl}"
                                                                  Path="Items.Count"/>
                                                     </MultiBinding>
                                                 </DataTrigger.Binding>
@@ -76,7 +79,7 @@
                                     <MouseBinding MouseAction="LeftClick"
                                                   Command="{Binding DataContext.NavigateToBreadcrumbCommand,
                                                             RelativeSource={RelativeSource AncestorType=Window}}"
-                                                  CommandParameter="{Binding}"/>    
+                                                  CommandParameter="{Binding}"/>
                                 </TextBlock.InputBindings>
                             </TextBlock>
 
@@ -90,7 +93,7 @@
                                                     <MultiBinding Converter="{StaticResource IsLastItem}">
                                                         <Binding RelativeSource="{RelativeSource AncestorType=ContentPresenter}"
                                                                  Path="(ItemsControl.AlternationIndex)"/>
-                                                                    <Binding RelativeSource="{RelativeSource AncestorType=ItemsControl}"
+                                                        <Binding RelativeSource="{RelativeSource AncestorType=ItemsControl}"
                                                                              Path="Items.Count"/>
                                                     </MultiBinding>
                                                 </DataTrigger.Binding>
@@ -112,7 +115,7 @@
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Left" Margin="16,0">
                 <Button Content="↶"
                         Command="{Binding UndoCommand}"
-                        IsEnabled="{Binding UndoRedo.CanUndo}">     
+                        IsEnabled="{Binding UndoRedo.CanUndo}">
                     <Button.Style>
                         <Style TargetType="Button" BasedOn="{StaticResource SidebarButtonStyle}">
                             <Setter Property="Opacity" Value="1"/>
@@ -152,7 +155,7 @@
 
         <!--Row 2: Sidebar and Canvas-->
         <Grid Grid.Row="2">
-            
+
             <!--Canvas Area-->
             <!-- Canvas area: renders whatever is inside CurrentBoard.Items -->
             <!-- Viewport fills the whole column at all times — handles drop/zoom input regardless of how zoomed-out the inner canvas visually is -->
@@ -257,6 +260,7 @@
                                                          Loaded="NoteRichTextBox_Loaded"
                                                          PreviewKeyDown="NoteRichTextBox_PreviewKeyDown"
                                                          PreviewTextInput="NoteRichTextBox_PreviewTextInput"
+                                                         PreviewMouseWheel="NoteRichTextBox_PreviewMouseWheel"
                                                          SelectionChanged="NoteRichTextBox_SelectionChanged">
                                                 <RichTextBox.Style>
                                                     <Style TargetType="RichTextBox">
@@ -289,7 +293,7 @@
                                                 Value="{StaticResource AccentBrush}"/>
                                     </DataTrigger>
 
-                                    
+
                                 </DataTemplate.Triggers>
                             </DataTemplate>
 
@@ -316,7 +320,7 @@
                                     <StackPanel Width="120" Cursor="Hand">
                                         <Border Background="{Binding Color, Converter={StaticResource HexToBrush}}" CornerRadius="10" Height="70">
                                             <TextBlock Text="📁" FontSize="26" HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                                </Border>
+                                        </Border>
 
                                         <!-- Title area: display TextBlock and edit TextBox occupy the same spot -->
                                         <Grid Margin="0,6,0,0">
@@ -378,15 +382,15 @@
                                                 <MenuItem Header="Delete" Click="MenuItem_Delete_Click" InputGestureText="Del"/>
                                             </ContextMenu>
                                         </Border.ContextMenu>
-                                        
+
                                     </Border>
-                                    
+
 
                                     <!-- Resize handle -->
                                     <Thumb Style="{StaticResource ResizeThumbStyle}"
                                            HorizontalAlignment="Right" VerticalAlignment="Bottom"
                                            DragDelta="ResizeThumb_DragDelta"
-                                           DragCompleted="ResizeThumb_DragCompleted"/>                 
+                                           DragCompleted="ResizeThumb_DragCompleted"/>
                                 </Grid>
 
                                 <DataTemplate.Triggers>
@@ -408,10 +412,10 @@
                                VerticalAlignment="Top"/>
 
                 </Grid>
-                                
+
             </Border>
-            
-            
+
+
             <!-- Sidebar: collapsed to icon-only width by default, expands on hover, renders above the canvas (Panel.ZIndex) so it never shifts canvas content -->
             <Border x:Name="Sidebar"
                     Background="{StaticResource SidebarBrush}"
@@ -421,7 +425,7 @@
                     ClipToBounds="True"
                     Effect="{StaticResource SoftShadow}"
                     MouseEnter="Sidebar_MouseEnter"
-                    MouseLeave="Sidebar_MouseLeave">        
+                    MouseLeave="Sidebar_MouseLeave">
 
                 <Border.Triggers>
 
@@ -475,7 +479,7 @@
                                         <TextBlock Text="Note" VerticalAlignment="Center"
                                                    Visibility="{Binding IsSidebarExpanded, 
                                                                 RelativeSource={RelativeSource AncestorType=Window}, 
-                                                                Converter={StaticResource BoolToVis}}"/>    
+                                                                Converter={StaticResource BoolToVis}}"/>
                                     </StackPanel>
                                 </Button>
 
@@ -487,7 +491,7 @@
                                         <TextBlock Text="Board" VerticalAlignment="Center"
                                                     Visibility="{Binding IsSidebarExpanded, 
                                                                  RelativeSource={RelativeSource AncestorType=Window}, 
-                                                                 Converter={StaticResource BoolToVis}}"/>        
+                                                                 Converter={StaticResource BoolToVis}}"/>
                                     </StackPanel>
                                 </Button>
 
@@ -530,13 +534,13 @@
                                                                        AboutToOpen="NoteDesignTool_AboutToOpen" 
                                                                        PopoverOpened="NoteDesignTool_PopoverOpened"
                                                                        PopoverClosed="NoteDesignTool_PopoverClosed"/>
-                                            
+
                                             <!-- Formatting row 1: character styles -->
                                             <StackPanel Margin="8,4">
                                                 <ToggleButton x:Name="BoldToggle" HorizontalAlignment="Stretch" Style="{StaticResource FormatToggleButtonStyle}" Click="FormatToggle_Click" Loaded="FormatToggle_Loaded" Tag="Bold">
                                                     <StackPanel Orientation="Horizontal">
                                                         <TextBlock Text="B" FontWeight="Bold" FontSize="{StaticResource SidebarIconSize}" Width="24" TextAlignment="Center" VerticalAlignment="Center"/>
-                                                        <TextBlock Text="Bold" Style="{StaticResource BodyText}" Margin="6,0,0,0"
+                                                        <TextBlock Text="Bold" Style="{StaticResource BodyText}" Margin="6,0,0,0" VerticalAlignment="Center"
                                                                    Visibility="{Binding IsSidebarExpanded, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource BoolToVis}}"/>
                                                     </StackPanel>
                                                 </ToggleButton>
@@ -544,7 +548,7 @@
                                                 <ToggleButton x:Name="ItalicToggle" HorizontalAlignment="Stretch" Style="{StaticResource FormatToggleButtonStyle}" Click="FormatToggle_Click" Loaded="FormatToggle_Loaded" Tag="Italic">
                                                     <StackPanel Orientation="Horizontal">
                                                         <TextBlock Text="I" FontStyle="Italic" FontSize="{StaticResource SidebarIconSize}" Width="24" TextAlignment="Center" VerticalAlignment="Center"/>
-                                                        <TextBlock Text="Italic" Style="{StaticResource BodyText}" Margin="6,0,0,0"
+                                                        <TextBlock Text="Italic" Style="{StaticResource BodyText}" Margin="6,0,0,0" VerticalAlignment="Center"
                                                                    Visibility="{Binding IsSidebarExpanded, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource BoolToVis}}"/>
                                                     </StackPanel>
                                                 </ToggleButton>
@@ -552,7 +556,7 @@
                                                 <ToggleButton x:Name="UnderlineToggle" HorizontalAlignment="Stretch" Style="{StaticResource FormatToggleButtonStyle}" Click="FormatToggle_Click" Loaded="FormatToggle_Loaded" Tag="Underline">
                                                     <StackPanel Orientation="Horizontal">
                                                         <TextBlock Text="U" TextDecorations="Underline" FontSize="{StaticResource SidebarIconSize}" Width="24" TextAlignment="Center" VerticalAlignment="Center"/>
-                                                        <TextBlock Text="Underline" Style="{StaticResource BodyText}" Margin="6,0,0,0"
+                                                        <TextBlock Text="Underline" Style="{StaticResource BodyText}" Margin="6,0,0,0" VerticalAlignment="Center"
                                                                    Visibility="{Binding IsSidebarExpanded, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource BoolToVis}}"/>
                                                     </StackPanel>
                                                 </ToggleButton>
@@ -560,7 +564,7 @@
                                                 <ToggleButton x:Name="StrikeToggle" HorizontalAlignment="Stretch" Style="{StaticResource FormatToggleButtonStyle}" Click="FormatToggle_Click" Loaded="FormatToggle_Loaded" Tag="Strikethrough">
                                                     <StackPanel Orientation="Horizontal">
                                                         <TextBlock Text="S" TextDecorations="Strikethrough" FontSize="{StaticResource SidebarIconSize}" Width="24" TextAlignment="Center" VerticalAlignment="Center"/>
-                                                        <TextBlock Text="Strikethrough" Style="{StaticResource BodyText}" Margin="6,0,0,0"
+                                                        <TextBlock Text="Strikethrough" Style="{StaticResource BodyText}" Margin="6,0,0,0" VerticalAlignment="Center"
                                                                    Visibility="{Binding IsSidebarExpanded, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource BoolToVis}}"/>
                                                     </StackPanel>
                                                 </ToggleButton>
@@ -598,7 +602,7 @@
                     HorizontalAlignment="Center"
                     VerticalAlignment="Bottom"
                     Effect="{StaticResource SoftShadow}"
-                    Panel.ZIndex="5">   
+                    Panel.ZIndex="5">
                 <TextBlock Text="{Binding ZoomDisplayText}" Style="{StaticResource CaptionText}"/>
             </Border>
 

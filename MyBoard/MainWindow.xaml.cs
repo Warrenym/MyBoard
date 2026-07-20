@@ -162,10 +162,28 @@ namespace MyBoard
 
         private void RootGrid_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
         {
+            var clickTarget = e.OriginalSource as DependencyObject;
+
+            // Clicks inside the Sidebar (Note/Board buttons, Color, the format
+            // toolbar) should NEVER exit note-editing mode — these tools are
+            // meant to be used WHILE actively editing a note. Without this
+            // check, clicking e.g. Bold registered as "clicked outside the
+            // note" and exited edit mode before the format could even apply,
+            // causing the toggle-then-reset loop.
+            bool clickInsideSidebar = IsDescendantOf(clickTarget, Sidebar);
+
+            // Text Style's popup renders in a SEPARATE top-level OS window
+            // (that's how Popup works), so IsDescendantOf can never reach it
+            // via the normal visual tree — checked separately here using the
+            // same cross-boundary helper built earlier for this exact popup.
+            bool clickInsideTextStylePopover =
+                activeTextStylePicker != null && IsPartOfControl(clickTarget, activeTextStylePicker);
+
+            if (clickInsideSidebar || clickInsideTextStylePopover) return;
 
             if (Keyboard.FocusedElement is RichTextBox noteBox && noteBox.DataContext is NoteItemViewModel note && note.IsEditing)
             {
-                if (!IsDescendantOf(e.OriginalSource as DependencyObject, noteBox))
+                if (!IsDescendantOf(clickTarget, noteBox))
                 {
                     note.IsEditing = false;
                     Keyboard.Focus(RootGrid);
@@ -175,7 +193,7 @@ namespace MyBoard
             {
                 if (editBox.DataContext is BoardViewModel board && board.IsEditingTitle)
                 {
-                    if (!IsDescendantOf(e.OriginalSource as DependencyObject, editBox))
+                    if (!IsDescendantOf(clickTarget, editBox))
                     {
                         board.CommitTitle();
                         Keyboard.Focus(RootGrid);

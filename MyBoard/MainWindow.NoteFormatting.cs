@@ -3,6 +3,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Documents;
+using System.Windows.Input;
 
 namespace MyBoard
 {
@@ -12,6 +13,14 @@ namespace MyBoard
         // whenever a note's design panel becomes active, mirroring how
         // TextStylePicker tracks its own target
         private RichTextBox? activeFormattingTarget;
+
+        // Strikethrough has no built-in EditingCommand (unlike Bold/Italic/
+        // Underline), so when the toggle is clicked with an empty selection
+        // (just a caret) we remember the intended state here and apply it
+        // to text as it's typed — see NoteRichTextBox_TextChanged.
+        private bool? pendingStrikethroughState;
+        private RichTextBox? pendingStrikethroughTarget;
+        private bool strikethroughTypingInProgress;
 
         // Direct references to the format toggle buttons, captured via their
         // own Loaded event. These buttons live inside a DataTemplate, which
@@ -43,11 +52,32 @@ namespace MyBoard
         {
             activeFormattingTarget = rtb;
 
+            // A pending strikethrough state survives the SelectionChanged that
+            // immediately follows a keystroke (the caret advancing by one
+            // character) so it keeps applying to the rest of what's typed.
+            // Any other selection change (click, arrow keys, real selection)
+            // means the caret moved for a reason other than our own typing,
+            // so the pending state is stale and should be dropped.
+            if (pendingStrikethroughTarget == rtb)
+            {
+                if (strikethroughTypingInProgress)
+                    strikethroughTypingInProgress = false;
+                else
+                {
+                    pendingStrikethroughTarget = null;
+                    pendingStrikethroughState = null;
+                }
+            }
+
             var selection = rtb.Selection;
             SetToggleState("BoldToggle", selection.GetPropertyValue(TextElement.FontWeightProperty) is FontWeight fw && fw == FontWeights.Bold);
             SetToggleState("ItalicToggle", selection.GetPropertyValue(TextElement.FontStyleProperty) is FontStyle fs && fs == FontStyles.Italic);
             SetToggleState("UnderlineToggle", HasDecoration(selection, TextDecorations.Underline));
-            SetToggleState("StrikeToggle", HasDecoration(selection, TextDecorations.Strikethrough));
+
+            bool strikeActive = pendingStrikethroughTarget == rtb
+                ? pendingStrikethroughState!.Value
+                : HasDecoration(selection, TextDecorations.Strikethrough);
+            SetToggleState("StrikeToggle", strikeActive);
         }
 
         private static bool HasDecoration(TextSelection selection, TextDecorationCollection target)
@@ -78,30 +108,29 @@ namespace MyBoard
 
         // Applies the clicked format to the current selection/caret using
         // WPF's built-in EditingCommands — these already handle "toggle on
-        // if off, toggle off if on" correctly on their own
+        // if off, toggle off if on" correctly on their own, AND correctly
+        // handle an empty (caret-only) selection by setting the format that
+        // will be used for the next typed characters. Manually calling
+        // TextSelection.ApplyPropertyValue (as this used to do) is a no-op
+        // on an empty selection, which is why typing didn't pick up the
+        // format and toggles appeared to "snap back".
         private void FormatToggle_Click(object sender, RoutedEventArgs e)
         {
             if (activeFormattingTarget == null) return;
             if (sender is not ToggleButton toggle || toggle.Tag is not string format) return;
 
-            var selection = activeFormattingTarget.Selection;
-            if (selection.IsEmpty) return; // Nothing selected — nothing to format yet
-
             switch (format)
             {
                 case "Bold":
-                    bool isBold = selection.GetPropertyValue(TextElement.FontWeightProperty) is FontWeight fw && fw == FontWeights.Bold;
-                    selection.ApplyPropertyValue(TextElement.FontWeightProperty, isBold ? FontWeights.Normal : FontWeights.Bold);
+                    EditingCommands.ToggleBold.Execute(null, activeFormattingTarget);
                     break;
 
                 case "Italic":
-                    bool isItalic = selection.GetPropertyValue(TextElement.FontStyleProperty) is FontStyle fst && fst == FontStyles.Italic;
-                    selection.ApplyPropertyValue(TextElement.FontStyleProperty, isItalic ? FontStyles.Normal : FontStyles.Italic);
+                    EditingCommands.ToggleItalic.Execute(null, activeFormattingTarget);
                     break;
 
                 case "Underline":
-                    bool hasUnderline = HasDecoration(selection, TextDecorations.Underline);
-                    selection.ApplyPropertyValue(Inline.TextDecorationsProperty, hasUnderline ? null : TextDecorations.Underline);
+                    EditingCommands.ToggleUnderline.Execute(null, activeFormattingTarget);
                     break;
 
                 case "Strikethrough":
@@ -113,12 +142,41 @@ namespace MyBoard
         }
 
         // Strikethrough has no built-in EditingCommand, so we toggle it
-        // manually on the current selection
+        // manually. For a real selection that's a direct property apply.
+        // For a caret-only position there's nothing to apply the property
+        // to yet, so remember the intended state and apply it to text as
+        // it's typed (see NoteRichTextBox_TextChanged).
         private void ToggleStrikethrough(RichTextBox rtb)
         {
-            bool alreadyStruck = HasDecoration(rtb.Selection, TextDecorations.Strikethrough);
-            rtb.Selection.ApplyPropertyValue(Inline.TextDecorationsProperty,
-                alreadyStruck ? null : TextDecorations.Strikethrough);
+            if (!rtb.Selection.IsEmpty)
+            {
+                bool alreadyStruck = HasDecoration(rtb.Selection, TextDecorations.Strikethrough);
+                rtb.Selection.ApplyPropertyValue(Inline.TextDecorationsProperty,
+                    alreadyStruck ? null : TextDecorations.Strikethrough);
+
+                pendingStrikethroughTarget = null;
+                pendingStrikethroughState = null;
+                return;
+            }
+
+            bool currentlyStruck = HasDecoration(rtb.Selection, TextDecorations.Strikethrough);
+            pendingStrikethroughState = !currentlyStruck;
+            pendingStrikethroughTarget = rtb;
+        }
+
+        // Fires as text is typed. If a strikethrough toggle is pending for
+        // this RichTextBox (set from a caret-only click above), apply it to
+        // the character(s) that were just inserted.
+        private void NoteRichTextBox_TextChanged(object sender, TextChangedEventArgs e)
+        {
+            if (sender is not RichTextBox rtb) return;
+            if (pendingStrikethroughTarget != rtb || pendingStrikethroughState is not bool wantStrike) return;
+            if (!strikethroughTypingInProgress) return; // only apply for actual typed input
+
+            var caret = rtb.CaretPosition;
+            var start = caret.GetPositionAtOffset(-1) ?? caret;
+            new TextRange(start, caret).ApplyPropertyValue(Inline.TextDecorationsProperty,
+                wantStrike ? TextDecorations.Strikethrough : null);
         }
     }
 }

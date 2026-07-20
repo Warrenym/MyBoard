@@ -12,11 +12,29 @@ namespace MyBoard
     {
         private Controls.TextStylePicker? activeTextStylePicker;
 
+        // Scrolls the note manually and ALWAYS marks the event handled —
+        // RichTextBox's own default wheel handling stops consuming the event
+        // once it reaches the top/bottom of its content, letting it bubble
+        // up to the canvas's zoom handler underneath. Taking full manual
+        // control here means scrolling a note never accidentally zooms the
+        // whole canvas, regardless of scroll position.
+        private void NoteRichTextBox_PreviewMouseWheel(object sender, MouseWheelEventArgs e)
+        {
+            if (sender is not RichTextBox rtb) return;
+
+            double scrollAmount = e.Delta > 0 ? -48 : 48;
+            rtb.ScrollToVerticalOffset(rtb.VerticalOffset + scrollAmount);
+
+            e.Handled = true;
+        }
+
 
         private void NoteDesignTool_AboutToOpen(object? sender, EventArgs e)
         {
             if (sender is not Controls.TextStylePicker picker) return;
             if (((MainViewModel)DataContext).CurrentBoard.PrimarySelectedItem is not NoteItemViewModel note) return;
+
+            activeTextStylePicker = picker;
 
             var richTextBox = FindNoteRichTextBox(note);
             picker.TargetRichTextBox = richTextBox;
@@ -44,6 +62,10 @@ namespace MyBoard
         private void NoteDesignTool_PopoverClosed(object? sender, EventArgs e)
         {
             System.Diagnostics.Debug.WriteLine("NoteDesignTool_PopoverClosed");
+
+            if (ReferenceEquals(activeTextStylePicker, sender))
+                activeTextStylePicker = null;
+
             if (!Sidebar.IsMouseOver)
             {
                 IsSidebarExpanded = false;
@@ -86,9 +108,10 @@ namespace MyBoard
             if (rtb.DataContext is not NoteItemViewModel note) return;
 
             rtb.Document = NoteDocumentConverter.ToFlowDocument(note.Document);
-            
-            rtb.SelectionChanged += (s, args) => NoteRichTextBox_RefreshFormatState(rtb);
 
+            rtb.SelectionChanged += (s, args) => NoteRichTextBox_RefreshFormatState(rtb);
+            rtb.TextChanged += NoteRichTextBox_TextChanged;
+            
             note.PropertyChanged += (s, args) =>
             {
                 if (args.PropertyName != nameof(NoteItemViewModel.IsEditing)) return;
@@ -190,6 +213,13 @@ namespace MyBoard
         private void NoteRichTextBox_PreviewTextInput(object sender, TextCompositionEventArgs e)
         {
             if (sender is not RichTextBox rtb) return;
+
+            // Flags this as a typing-caused change, consumed in
+            // NoteRichTextBox_RefreshFormatState, so a pending strikethrough
+            // toggle knows to keep applying rather than being treated as a
+            // stale caret move (click, arrow keys, etc.)
+            strikethroughTypingInProgress = true;
+
             var paragraph = rtb.CaretPosition.Paragraph;
             if (paragraph == null) return;
             if (Services.NoteDocumentConverter.DetectBlockTypePublic(paragraph) != Model.NoteBlockType.QuoteBlock) return;
