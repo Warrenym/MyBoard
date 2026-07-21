@@ -9,9 +9,7 @@ namespace MyBoard.Services
     internal static class ImageStorageService
     {
         // All images live in %AppData%\MyBoard\Images
-        private static readonly string ImageFolder = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-            "MyBoard", "Images");
+        private static readonly string ImageFolder = Path.Combine(AppStoragePaths.RootFolder, "Images");
 
         static ImageStorageService()
         {
