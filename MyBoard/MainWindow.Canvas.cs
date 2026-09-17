@@ -199,21 +199,28 @@ namespace MyBoard
             if (CanvasViewport.IsMouseCaptured)
                 CanvasViewport.ReleaseMouseCapture();
 
-            // A Popup is a separate top-level OS window, so clicking INSIDE one
-            // also fires this event — checking the process (not just the window)
-            // lets us tell "switched to a different app" apart from "clicked into
-            // our own popup," and only close popovers for the former
-            IntPtr foreground = GetForegroundWindow();
-            GetWindowThreadProcessId(foreground, out uint foregroundProcessId);
-            uint ourProcessId = (uint)System.Diagnostics.Process.GetCurrentProcess().Id;
-
-            if (foregroundProcessId != ourProcessId)
+            // Deferred: Window.Deactivated can fire slightly BEFORE Windows finishes
+            // updating GetForegroundWindow() during an Alt-Tab transition — checking
+            // immediately can still see OUR window as "foreground" for a brief
+            // moment, making the process check below wrongly conclude nothing
+            // actually changed. Deferring to the next dispatcher cycle lets the OS
+            // settle first, so the check reflects reality.
+            Dispatcher.BeginInvoke(new Action(() =>
             {
-                activeTextStylePicker?.ClosePopover();
-                if (((FrameworkElement)Content).FindName("BoardColorTool") is Controls.ColorPickerButton colorTool)
-                    colorTool.ClosePopover();
-            }
+                IntPtr foreground = GetForegroundWindow();
+                GetWindowThreadProcessId(foreground, out uint foregroundProcessId);
+                uint ourProcessId = (uint)System.Diagnostics.Process.GetCurrentProcess().Id;
 
+                System.Diagnostics.Debug.WriteLine($"Deactivated check: foregroundProcessId={foregroundProcessId}, ourProcessId={ourProcessId}, different={foregroundProcessId != ourProcessId}");
+
+                if (foregroundProcessId != ourProcessId)
+                {
+                    System.Diagnostics.Debug.WriteLine("Closing popovers due to app switch");
+                    activeTextStylePicker?.ClosePopover();
+                    if (((FrameworkElement)Content).FindName("BoardColorTool") is Controls.ColorPickerButton colorTool)
+                        colorTool.ClosePopover();
+                }
+            }), System.Windows.Threading.DispatcherPriority.ApplicationIdle);
         }
 
         private void CanvasViewport_MouseMove(object sender, MouseEventArgs e)

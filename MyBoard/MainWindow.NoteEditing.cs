@@ -12,11 +12,25 @@ namespace MyBoard
     {
         private Controls.TextStylePicker? activeTextStylePicker;
 
+        // Scrolls the note manually and ALWAYS marks the event handled —
+        // RichTextBox's own default wheel handling stops consuming the event once it reaches the top/bottom of its content
+        private void NoteRichTextBox_PreviewMouseWheel(object sender, MouseWheelEventArgs e)
+        {
+            if (sender is not RichTextBox rtb) return;
+
+            double scrollAmount = e.Delta > 0 ? -48 : 48;
+            rtb.ScrollToVerticalOffset(rtb.VerticalOffset + scrollAmount);
+
+            e.Handled = true;
+        }
+
 
         private void NoteDesignTool_AboutToOpen(object? sender, EventArgs e)
         {
             if (sender is not Controls.TextStylePicker picker) return;
             if (((MainViewModel)DataContext).CurrentBoard.PrimarySelectedItem is not NoteItemViewModel note) return;
+
+            activeTextStylePicker = picker;
 
             var richTextBox = FindNoteRichTextBox(note);
             picker.TargetRichTextBox = richTextBox;
@@ -25,9 +39,7 @@ namespace MyBoard
             {
                 Point topLeft = richTextBox.PointToScreen(new Point(0, 0));
 
-                // Position the popover fully outside the note, to its left and
-                // slightly above the top edge — not just nudged, but offset by
-                // the popover's own approximate width so it never overlaps the note
+                // Position the popover fully outside the note, to its left and slightly above the top edge
                 const double popoverWidth = 180;
                 const double gap = 12;
                 picker.AnchorScreenPoint = new Point(topLeft.X - popoverWidth - gap, topLeft.Y);
@@ -44,6 +56,10 @@ namespace MyBoard
         private void NoteDesignTool_PopoverClosed(object? sender, EventArgs e)
         {
             System.Diagnostics.Debug.WriteLine("NoteDesignTool_PopoverClosed");
+
+            if (ReferenceEquals(activeTextStylePicker, sender))
+                activeTextStylePicker = null;
+
             if (!Sidebar.IsMouseOver)
             {
                 IsSidebarExpanded = false;
@@ -78,16 +94,16 @@ namespace MyBoard
 
 
         // Fires once when a note's RichTextBox first enters the visual tree —
-        // loads its initial content, then subscribes to IsEditing so entering/
-        // exiting edit mode loads/saves the document at the right moments.
+        // loads its initial content, then subscribes to IsEditing so entering/exiting edit mode loads/saves the document at the right moments.
         private void NoteRichTextBox_Loaded(object sender, RoutedEventArgs e)
         {
             if (sender is not RichTextBox rtb) return;
             if (rtb.DataContext is not NoteItemViewModel note) return;
 
             rtb.Document = NoteDocumentConverter.ToFlowDocument(note.Document);
-            
+
             rtb.SelectionChanged += (s, args) => NoteRichTextBox_RefreshFormatState(rtb);
+            rtb.TextChanged += NoteRichTextBox_TextChanged;
 
             note.PropertyChanged += (s, args) =>
             {
@@ -103,8 +119,7 @@ namespace MyBoard
                 }
                 else
                 {
-                    // Leaving edit mode — convert the FlowDocument back into
-                    // our portable model and save it to the ViewModel/Model
+                    // Leaving edit mode — convert the FlowDocument back into the portable model and save it to the ViewModel/Model
                     note.Document = NoteDocumentConverter.ToNoteDocument(rtb.Document);
                 }
             };
@@ -119,8 +134,7 @@ namespace MyBoard
             var currentParagraph = rtb.CaretPosition.Paragraph;
             if (currentParagraph == null) return;
 
-            // Clamp the caret inside quote marks if we're in a Quote Block —
-            // runs first, before any key-specific handling below
+            // Clamp the caret inside quote marks if inside a Quote Block — runs first, before any key-specific handling below
             if (Services.NoteDocumentConverter.DetectBlockTypePublic(currentParagraph) == Model.NoteBlockType.QuoteBlock)
             {
                 if (rtb.CaretPosition.CompareTo(currentParagraph.ContentStart) <= 0)
@@ -137,14 +151,11 @@ namespace MyBoard
                 return;
             }
 
-            // Shift+Enter: let WPF's default line-break behavior happen untouched —
-            // this preserves the current block's style, per your spec
+            // Shift+Enter: let WPF's default line-break behavior happen untouched — this preserves the current block's style
             if (e.Key == Key.Enter && Keyboard.Modifiers == ModifierKeys.Shift)
                 return;
 
-            // Plain Enter: take full manual control — split the text at the caret,
-            // create a new paragraph ourselves, and style it explicitly, rather
-            // than racing WPF's own paragraph-creation timing
+            // Plain Enter: take full manual control — split the text at the caret, create a new paragraph, and style it explicitly
             if (e.Key == Key.Enter && Keyboard.Modifiers == ModifierKeys.None)
             {
                 e.Handled = true;
@@ -155,8 +166,7 @@ namespace MyBoard
 
                 var currentType = Services.NoteDocumentConverter.DetectBlockTypePublic(paragraph);
 
-                // Quote Block is excluded from the reset — Enter inside a quote just
-                // continues as another quote line, per your spec
+                // Quote Block is excluded from the reset — Enter inside a quote just continues as another quote line
                 var targetType = currentType == Model.NoteBlockType.QuoteBlock
                     ? Model.NoteBlockType.QuoteBlock
                     : Model.NoteBlockType.Normal;
@@ -190,6 +200,13 @@ namespace MyBoard
         private void NoteRichTextBox_PreviewTextInput(object sender, TextCompositionEventArgs e)
         {
             if (sender is not RichTextBox rtb) return;
+
+            // Flags this as a typing-caused change, consumed in
+            // NoteRichTextBox_RefreshFormatState, so a pending strikethrough
+            // toggle knows to keep applying rather than being treated as a
+            // stale caret move (click, arrow keys, etc.)
+            strikethroughTypingInProgress = true;
+
             var paragraph = rtb.CaretPosition.Paragraph;
             if (paragraph == null) return;
             if (Services.NoteDocumentConverter.DetectBlockTypePublic(paragraph) != Model.NoteBlockType.QuoteBlock) return;
@@ -202,8 +219,7 @@ namespace MyBoard
         }
 
 
-        // Runs every time the caret moves (click, arrow keys, etc.) —
-        //  clamps it back inside the quote marks immediately, before the user has a chance to type at an invalid position
+        // Runs every time the caret moves (click, arrow keys, etc.) -  clamps it back inside the quote marks immediately, before the user has a chance to type at an invalid position
         private bool isAdjustingCaret;
 
         private void NoteRichTextBox_SelectionChanged(object sender, RoutedEventArgs e)

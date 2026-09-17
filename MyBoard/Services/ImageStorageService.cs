@@ -8,8 +8,8 @@ namespace MyBoard.Services
     // Handles saving images from any drag source into the app-managed, synced folder.
     internal static class ImageStorageService
     {
-        // Images live beside board.json so OneDrive syncs the complete board.
-        private static readonly string ImageFolder = AppStoragePaths.ImageFolder;
+		// Images live beside board.json so OneDrive syncs the complete board.
+		private static readonly string ImageFolder = AppStoragePaths.ImageFolder;
 
         static ImageStorageService()
         {
