@@ -361,3 +361,9 @@ MigrationBackup/
 
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
+
+# OneDrive conflict copies (the canonical source is tracked by Git)
+*-LAPTOP-PLBC9PJQ*
+
+# Local .NET CLI state used for sandboxed builds
+.dotnet-home/

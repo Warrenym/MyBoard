@@ -101,6 +101,19 @@ This project has become my playground for learning software architecture, WPF, U
 * Better text editing experience
 * Numerous bug fixes and UI refinements
 
+### Data Sync
+
+Board data, custom colors, and managed images are stored in `OneDrive\MyBoard`
+when OneDrive is available. Existing data from `%AppData%\MyBoard` is copied into
+that folder automatically on first launch, without replacing data that is already
+in OneDrive.
+
+If the PC has multiple OneDrive accounts, set the `MYBOARD_DATA_FOLDER`
+environment variable to the same synced folder on each PC. Let OneDrive finish
+syncing before opening MyBoard on the other PC, and avoid editing the board on
+both PCs at the same time because OneDrive cannot merge changes inside
+`board.json`.
+
 ---
 
 ## Current Features Roadmap

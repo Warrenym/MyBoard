@@ -10,9 +10,7 @@ namespace MyBoard.Services
     // Persists the user's custom palette (Saved + Recently Picked) to a single app-wide JSON file
     static class ColorPaletteService
     {
-        private static readonly string SaveFolder = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-            "MyBoard");
+        private static readonly string SaveFolder = AppStoragePaths.RootFolder;
 
         private static readonly string SaveFilePath = Path.Combine(SaveFolder, "palette.json");
 
@@ -37,9 +35,8 @@ namespace MyBoard.Services
 
         public static void Save(ColorPaletteData data)
         {
-            Directory.CreateDirectory(SaveFolder);
             string json = JsonSerializer.Serialize(data, Options);
-            File.WriteAllText(SaveFilePath, json);
+            AppStoragePaths.WriteAllTextAtomically(SaveFilePath, json);
         }
     }
 }

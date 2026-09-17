@@ -7,12 +7,10 @@ using System.Text.Json;
 
 namespace MyBoard.Services
 {
-    // Handles saving/loading the entire board tree (Home and everything nested inside it) as a single JSON file in AppData.
+    // Handles saving/loading the entire board tree (Home and everything nested inside it).
     internal static class BoardSaveService
     {
-        private static readonly string SaveFolder = Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-        "MyBoard");
+        private static readonly string SaveFolder = AppStoragePaths.RootFolder;
 
         private static readonly string SaveFilePath = Path.Combine(SaveFolder, "board.json");
 
@@ -22,9 +20,8 @@ namespace MyBoard.Services
         // Serializes the root board (and everything nested inside it) to disk
         public static void Save(Board rootBoard)
         {
-            Directory.CreateDirectory(SaveFolder); // Ensure the folder exists on first save
             string json = JsonSerializer.Serialize(rootBoard, Options);
-            File.WriteAllText(SaveFilePath, json);
+            AppStoragePaths.WriteAllTextAtomically(SaveFilePath, json);
         }
 
         // Loads the saved board tree, or returns null if no save file exists yet (e.g. first time running the app)
@@ -37,9 +34,23 @@ namespace MyBoard.Services
             var board = JsonSerializer.Deserialize<Board>(json, Options);
 
             if (board != null)
+            {
                 MigrateLegacyNotes(board);
+                ResolveImagePaths(board);
+            }
 
             return board;
+        }
+
+        private static void ResolveImagePaths(Board board)
+        {
+            foreach (var item in board.Items)
+            {
+                if (item is ImageItem image)
+                    image.FilePath = AppStoragePaths.ResolveImagePath(image.FilePath);
+                else if (item is Board childBoard)
+                    ResolveImagePaths(childBoard);
+            }
         }
 
         private static void MigrateLegacyNotes(Board board)

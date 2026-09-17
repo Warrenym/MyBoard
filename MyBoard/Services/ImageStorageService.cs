@@ -5,13 +5,11 @@ using System.Windows.Media.Imaging;
 
 namespace MyBoard.Services
 {
-    // Handles saving images(from any drag source) into an app - managed folder, so ImageItem.FilePath always points somewhere stable and owned by the app.
+    // Handles saving images from any drag source into the app-managed, synced folder.
     internal static class ImageStorageService
     {
-        // All images live in %AppData%\MyBoard\Images
-        private static readonly string ImageFolder = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-            "MyBoard", "Images");
+        // Images live beside board.json so OneDrive syncs the complete board.
+        private static readonly string ImageFolder = AppStoragePaths.ImageFolder;
 
         static ImageStorageService()
         {

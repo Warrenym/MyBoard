@@ -9,6 +9,10 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <!-- Keep OneDrive conflict copies from being compiled as duplicate source. -->
+    <Compile Remove="**\*-LAPTOP-PLBC9PJQ.cs" />
+    <Page Remove="**\*-LAPTOP-PLBC9PJQ.xaml" />
+
     <None Remove="Assets\closedHand.cur" />
     <None Remove="Assets\Fonts\Nunito-Bold.ttf" />
     <None Remove="Assets\Fonts\Nunito-Regular.ttf" />
