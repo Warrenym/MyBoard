@@ -1,11 +1,11 @@
 ﻿using System.IO;
 using System.Net.Http;
-using System.Reflection.Metadata;
 using System.Windows.Media.Imaging;
 
 namespace MyBoard.Services
 {
-    // Handles saving images from any drag source into the app-managed, synced folder.
+    // Handles saving images from drag-and-drop and clipboard sources into the
+    // app-managed, synced folder.
     internal static class ImageStorageService
     {
 		// Images live beside board.json so OneDrive syncs the complete board.
@@ -41,21 +41,36 @@ namespace MyBoard.Services
             return fullPath;
         }
 
+        public static string SaveDataUri(string dataUri)
+        {
+            int commaIndex = dataUri.IndexOf(',');
+            if (commaIndex < 0 || !dataUri[..commaIndex].Contains(";base64", StringComparison.OrdinalIgnoreCase))
+                throw new InvalidDataException("The image data URI is not base64 encoded.");
+
+            byte[] data = Convert.FromBase64String(dataUri[(commaIndex + 1)..]);
+            return SaveEncodedImage(data);
+        }
+
         // Case 3: Browser drop — downloads the image from its URL
         public static async Task<string> DownloadImageAsync(string url)
         {
             using var httpClient = new HttpClient();
             byte[] data = await httpClient.GetByteArrayAsync(url);
+            return SaveEncodedImage(data);
+        }
 
-            string extension = Path.GetExtension(new Uri(url).LocalPath);
-            if (string.IsNullOrEmpty(extension) || extension.Length > 5)
-                extension = ".jpg"; // Fallback when the URL has no clean file extension
+        private static string SaveEncodedImage(byte[] data)
+        {
+            using var input = new MemoryStream(data);
+            var decoder = BitmapDecoder.Create(
+                input,
+                BitmapCreateOptions.PreservePixelFormat,
+                BitmapCacheOption.OnLoad);
 
-            string fileName = $"{Guid.NewGuid()}{extension}";
-            string fullPath = Path.Combine(ImageFolder, fileName);
+            if (decoder.Frames.Count == 0)
+                throw new InvalidDataException("The supplied data does not contain an image.");
 
-            await File.WriteAllBytesAsync(fullPath, data);
-            return fullPath;
+            return SaveBitmap(decoder.Frames[0]);
         }
 
     }

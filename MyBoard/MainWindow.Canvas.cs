@@ -1,6 +1,7 @@
 ﻿using MyBoard.Services;
 using MyBoard.ViewModel;
 using MyBoard.Commands;
+using System.Net;
 using System.Text.RegularExpressions;
 using System.Windows;
 using System.Windows.Controls.Primitives;
@@ -34,38 +35,81 @@ namespace MyBoard
             Point dropPosition = CanvasCoordinateService.ScreenToCanvas(
                 e.GetPosition(CanvasViewport), viewModel.PanX, viewModel.PanY, viewModel.ZoomLevel);
 
-            if (e.Data.GetDataPresent(DataFormats.FileDrop))
+            await ImportImagesAsync(e.Data, dropPosition);
+            e.Handled = true;
+        }
+
+        private async Task<bool> ImportImagesAsync(IDataObject data, Point canvasPosition)
+        {
+            var board = ((MainViewModel)DataContext).CurrentBoard;
+            int importedCount = 0;
+
+            if (data.GetDataPresent(DataFormats.FileDrop) &&
+                data.GetData(DataFormats.FileDrop) is string[] files)
             {
-                string[] files = (string[])e.Data.GetData(DataFormats.FileDrop);
                 foreach (var path in files.Where(IsImageFile))
                 {
                     string saved = ImageStorageService.CopyFile(path);
-                    viewModel.CurrentBoard.AddImage(saved, dropPosition.X, dropPosition.Y);
+                    board.AddImage(saved, canvasPosition.X + (importedCount * 20), canvasPosition.Y + (importedCount * 20));
+                    importedCount++;
                 }
-                return;
+
+                if (importedCount > 0) return true;
             }
 
-            if (e.Data.GetDataPresent(DataFormats.Bitmap) &&
-                e.Data.GetData(DataFormats.Bitmap) is BitmapSource bitmap)
+            if (data.GetDataPresent(DataFormats.Bitmap) &&
+                data.GetData(DataFormats.Bitmap) is BitmapSource bitmap)
             {
                 string saved = ImageStorageService.SaveBitmap(bitmap);
-                viewModel.CurrentBoard.AddImage(saved, dropPosition.X, dropPosition.Y);
-                return;
+                board.AddImage(saved, canvasPosition.X, canvasPosition.Y);
+                return true;
             }
 
-            string? url = ExtractImageUrl(e.Data);
+            string? url = ExtractImageUrl(data);
             if (url != null)
             {
                 try
                 {
-                    string saved = await ImageStorageService.DownloadImageAsync(url);
-                    viewModel.CurrentBoard.AddImage(saved, dropPosition.X, dropPosition.Y);
+                    string saved = url.StartsWith("data:image/", StringComparison.OrdinalIgnoreCase)
+                        ? ImageStorageService.SaveDataUri(url)
+                        : await ImageStorageService.DownloadImageAsync(url);
+                    board.AddImage(saved, canvasPosition.X, canvasPosition.Y);
+                    return true;
                 }
                 catch
                 {
-                    MessageBox.Show("Couldn't download that image — try saving it locally first.");
+                    MessageBox.Show("Couldn't paste that image — try saving it locally first.");
                 }
             }
+
+            return false;
+        }
+
+        private async Task PasteAtCanvasPositionAsync(Point canvasPosition)
+        {
+            IDataObject? data;
+            try
+            {
+                data = Clipboard.GetDataObject();
+            }
+            catch (System.Runtime.InteropServices.ExternalException)
+            {
+                MessageBox.Show("The clipboard is busy. Please try pasting again.");
+                return;
+            }
+
+            var board = ((MainViewModel)DataContext).CurrentBoard;
+            if (data != null && ClipboardService.OwnsSystemClipboard(data))
+            {
+                board.PasteClipboard(canvasPosition.X, canvasPosition.Y);
+                return;
+            }
+
+            if (data != null && await ImportImagesAsync(data, canvasPosition))
+                return;
+
+            // Retain in-app paste if setting the Windows clipboard marker failed.
+            board.PasteClipboard(canvasPosition.X, canvasPosition.Y);
         }
 
         private static bool IsImageFile(string path)
@@ -76,20 +120,25 @@ namespace MyBoard
 
         private static string? ExtractImageUrl(IDataObject data)
         {
-            if (data.GetDataPresent(DataFormats.Text))
-            {
-                string text = ((string)data.GetData(DataFormats.Text)).Trim();
-                if (Uri.TryCreate(text, UriKind.Absolute, out var uri) &&
-                    (uri.Scheme == "http" || uri.Scheme == "https"))
-                    return text;
-            }
-
+            // Browser clipboards often include both the page URL as plain text and
+            // the actual image URL in HTML, so prefer the image-specific HTML.
             if (data.GetDataPresent(DataFormats.Html))
             {
                 string html = (string)data.GetData(DataFormats.Html);
-                var match = Regex.Match(html, "<img[^>]+src=[\"']([^\"']+)[\"']");
+                var match = Regex.Match(html, "<img[^>]+src\\s*=\\s*[\"']([^\"']+)[\"']", RegexOptions.IgnoreCase);
                 if (match.Success)
-                    return match.Groups[1].Value;
+                    return WebUtility.HtmlDecode(match.Groups[1].Value);
+            }
+
+            if (data.GetDataPresent(DataFormats.Text))
+            {
+                string text = ((string)data.GetData(DataFormats.Text)).Trim();
+                if (text.StartsWith("data:image/", StringComparison.OrdinalIgnoreCase))
+                    return text;
+
+                if (Uri.TryCreate(text, UriKind.Absolute, out var uri) &&
+                    (uri.Scheme == "http" || uri.Scheme == "https"))
+                    return text;
             }
 
             return null;

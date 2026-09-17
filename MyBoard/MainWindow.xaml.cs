@@ -70,7 +70,7 @@ namespace MyBoard
 
 
         // Deletes/Undo/Redo/Cut/Copy/Paste/Duplicate/Rename shortcuts, and Escape for the color popover
-        private void MainWindow_PreviewKeyDown(object sender, KeyEventArgs e)
+        private async void MainWindow_PreviewKeyDown(object sender, KeyEventArgs e)
         {
             bool isTyping = Keyboard.FocusedElement is TextBox || Keyboard.FocusedElement is RichTextBox;
             var board = ((MainViewModel)DataContext).CurrentBoard;
@@ -90,7 +90,10 @@ namespace MyBoard
                     case Key.Y: viewModel.RedoCommand.Execute(null); break;
                     case Key.C: board.CopySelectedItems(); break;
                     case Key.X: board.CutSelectedItems(); break;
-                    case Key.V: board.PasteClipboard(lastCanvasMousePosition.X, lastCanvasMousePosition.Y); break;
+                    case Key.V:
+                        await PasteAtCanvasPositionAsync(lastCanvasMousePosition);
+                        e.Handled = true;
+                        break;
                     case Key.D: board.DuplicateSelectedItems(); break;
                 }
             }

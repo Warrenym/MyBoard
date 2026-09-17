@@ -70,6 +70,7 @@ This project has become my playground for learning software architecture, WPF, U
 ### Images
 
 * Drag-and-drop images directly into the board
+* Paste images from the Windows clipboard, including screenshots, copied files, browser images, and image URLs
 * Image resizing
 * Preserved aspect ratio
 * Automatic removal of unnecessary white padding

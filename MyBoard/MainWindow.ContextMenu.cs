@@ -24,10 +24,9 @@ namespace MyBoard
                 boardToRename.BeginEditingTitle();
         }
 
-        private void MenuItem_PasteCanvas_Click(object sender, RoutedEventArgs e)
+        private async void MenuItem_PasteCanvas_Click(object sender, RoutedEventArgs e)
         {
-            var board = ((MainViewModel)DataContext).CurrentBoard;
-            board.PasteClipboard(lastCanvasMousePosition.X, lastCanvasMousePosition.Y);
+            await PasteAtCanvasPositionAsync(lastCanvasMousePosition);
         }
     }
 }
