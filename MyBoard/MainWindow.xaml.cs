@@ -1,5 +1,8 @@
 ﻿using MyBoard.ViewModel;
+using Microsoft.Win32;
+using MyBoard.Services;
 using System.ComponentModel;
+using System.IO;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -12,32 +15,43 @@ namespace MyBoard
         public MainWindow()
         {
             InitializeComponent();
-            DataContext = new MainViewModel();
+            AttachViewModel(new MainViewModel());
 
             PreviewKeyDown += MainWindow_PreviewKeyDown;
             PreviewKeyDown += MainWindow_PreviewKeyDown_Pan;
             PreviewKeyUp += MainWindow_PreviewKeyUp_Pan;
             Closing += MainWindow_Closing;
             Deactivated += MainWindow_Deactivated;
-
-            var viewModel = (MainViewModel)DataContext;
-
-            // Subscribe to the initial board's selection changes
-            SubscribeToBoardSelection(viewModel.CurrentBoard);
-
-            // Whenever CurrentBoard changes (navigating in/out of any board), re-subscribe to the NEW board's selection changes
-            viewModel.PropertyChanged += (s, e) =>
-            {
-                if (e.PropertyName == nameof(MainViewModel.CurrentBoard))
-                {
-                    SubscribeToBoardSelection(viewModel.CurrentBoard);
-                    SlideSidebarPanel(false);
-                }
-            };
+            Activated += MainWindow_Activated;
         }
 
-        // Tracks which board is currently listening to, to unsubscribe cleanly before attaching to a new one 
+        // Tracks which board is currently listening to, to unsubscribe cleanly before attaching to a new one
         private BoardViewModel? subscribedBoard;
+        private MainViewModel? attachedViewModel;
+        private bool isStoragePromptOpen;
+
+        private void AttachViewModel(MainViewModel viewModel)
+        {
+            if (attachedViewModel != null)
+                attachedViewModel.PropertyChanged -= ViewModel_PropertyChanged;
+            if (subscribedBoard != null)
+                subscribedBoard.PropertyChanged -= Board_PropertyChanged;
+
+            attachedViewModel = viewModel;
+            DataContext = viewModel;
+            SubscribeToBoardSelection(viewModel.CurrentBoard);
+            viewModel.PropertyChanged += ViewModel_PropertyChanged;
+            SlideSidebarPanel(false);
+        }
+
+        private void ViewModel_PropertyChanged(object? sender, PropertyChangedEventArgs e)
+        {
+            if (e.PropertyName == nameof(MainViewModel.CurrentBoard) && sender is MainViewModel viewModel)
+            {
+                SubscribeToBoardSelection(viewModel.CurrentBoard);
+                SlideSidebarPanel(false);
+            }
+        }
 
         private void SubscribeToBoardSelection(BoardViewModel board)
         {
@@ -85,7 +99,10 @@ namespace MyBoard
             }
 
             if (e.Key == Key.S && Keyboard.Modifiers == ModifierKeys.Control)
-                viewModel.SaveBoardCommand.Execute(null);
+            {
+                TrySave(viewModel);
+                e.Handled = true;
+            }
 
             if (canvasShortcut && Keyboard.Modifiers == ModifierKeys.Control)
             {
@@ -119,9 +136,109 @@ namespace MyBoard
             }
         }
 
-        private void MainWindow_Closing(object sender, System.ComponentModel.CancelEventArgs e)
+        private void MainWindow_Closing(object? sender, System.ComponentModel.CancelEventArgs e)
         {
-            ((MainViewModel)DataContext).SaveBoardCommand.Execute(null);
+            if (!TrySave((MainViewModel)DataContext)) e.Cancel = true;
+        }
+
+        private bool TrySave(MainViewModel viewModel)
+        {
+            try
+            {
+                viewModel.SaveNow();
+                return true;
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(this,
+                    $"MyBoard could not save to:\n{viewModel.StorageFolder}\n\n{ex.Message}",
+                    "Save failed", MessageBoxButton.OK, MessageBoxImage.Error);
+                return false;
+            }
+        }
+
+        private void ChangeDataLocation_Click(object sender, RoutedEventArgs e)
+        {
+            var viewModel = (MainViewModel)DataContext;
+            var dialog = new OpenFolderDialog
+            {
+                Title = "Choose the folder that stores MyBoard data",
+                InitialDirectory = viewModel.StorageFolder,
+                Multiselect = false
+            };
+
+            isStoragePromptOpen = true;
+            try
+            {
+                if (dialog.ShowDialog(this) != true) return;
+                string selectedFolder = Path.GetFullPath(dialog.FolderName)
+                    .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+                if (string.Equals(selectedFolder, viewModel.StorageFolder,
+                    StringComparison.OrdinalIgnoreCase))
+                {
+                    AppStoragePaths.SelectRootFolder(selectedFolder);
+                    MessageBox.Show(this, "This folder is now saved as this computer's explicit MyBoard data location.",
+                        "Data location saved", MessageBoxButton.OK, MessageBoxImage.Information);
+                    return;
+                }
+
+                if (!TrySave(viewModel)) return;
+                string selectedBoard = Path.Combine(selectedFolder, "board.json");
+                if (File.Exists(selectedBoard))
+                {
+                    _ = new BoardSaveService(selectedFolder).Load();
+                    var answer = MessageBox.Show(this,
+                        "This folder already contains a MyBoard board. Switch to it and replace the board currently shown in the app?",
+                        "Use existing MyBoard data", MessageBoxButton.YesNo,
+                        MessageBoxImage.Question, MessageBoxResult.No);
+                    if (answer != MessageBoxResult.Yes) return;
+                }
+                else
+                {
+                    AppStoragePaths.CopyDataIfMissing(viewModel.StorageFolder, selectedFolder);
+                }
+
+                AppStoragePaths.SelectRootFolder(selectedFolder);
+                AttachViewModel(new MainViewModel());
+                MessageBox.Show(this,
+                    $"MyBoard now stores its data in:\n{selectedFolder}\n\nChoose this same synced folder on your other computer.",
+                    "Data location changed", MessageBoxButton.OK, MessageBoxImage.Information);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(this, $"The data location could not be changed.\n\n{ex.Message}",
+                    "Data location unchanged", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+            finally
+            {
+                isStoragePromptOpen = false;
+            }
+        }
+
+        private void MainWindow_Activated(object? sender, EventArgs e)
+        {
+            if (isStoragePromptOpen || DataContext is not MainViewModel viewModel) return;
+
+            try
+            {
+                if (!viewModel.HasExternalBoardChanges()) return;
+                isStoragePromptOpen = true;
+                var answer = MessageBox.Show(this,
+                    "The board changed in the data folder, probably because it was synced from another computer. Reload it now?\n\nChoosing No keeps the current view, but saving remains blocked to protect the newer file.",
+                    "Synced board changed", MessageBoxButton.YesNo,
+                    MessageBoxImage.Warning, MessageBoxResult.Yes);
+                if (answer == MessageBoxResult.Yes)
+                    AttachViewModel(new MainViewModel());
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(this, $"MyBoard could not check the synced board.\n\n{ex.Message}",
+                    "Sync check failed", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+            finally
+            {
+                isStoragePromptOpen = false;
+            }
         }
 
 

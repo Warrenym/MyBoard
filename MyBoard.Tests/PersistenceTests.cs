@@ -239,4 +239,47 @@ public sealed class PersistenceTests : IsolatedTest
         using var json = JsonDocument.Parse(File.ReadAllText(FileInTest("board.json")));
         Assert.Equal(BoardSaveService.CurrentVersion, json.RootElement.GetProperty("FormatVersion").GetInt32());
     }
+
+    [Fact]
+    public void Managed_image_paths_are_portable_on_disk_and_absolute_in_memory()
+    {
+        string images = FileInTest("Images");
+        Directory.CreateDirectory(images);
+        string imagePath = Path.Combine(images, "shared.png");
+        File.WriteAllBytes(imagePath, [1, 2, 3]);
+        var board = new Board
+        {
+            Items = [new Board
+            {
+                Items = [new ImageItem { FilePath = imagePath }]
+            }]
+        };
+
+        var storage = new BoardSaveService(Folder);
+        storage.Save(board);
+
+        string json = File.ReadAllText(FileInTest("board.json"));
+        Assert.DoesNotContain(Folder, json, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Images", json);
+        var loadedChild = Assert.IsType<Board>(Assert.Single(storage.Load()!.Items));
+        Assert.Equal(imagePath, Assert.IsType<ImageItem>(Assert.Single(loadedChild.Items)).FilePath);
+        Assert.Equal(imagePath, Assert.IsType<ImageItem>(Assert.Single(board.Items.Cast<Board>()).Items.Single()).FilePath);
+    }
+
+    [Fact]
+    public void External_change_detection_and_timestamped_backups_protect_synced_data()
+    {
+        var active = new BoardSaveService(Folder);
+        active.Save(new Board { Title = "first" });
+        Assert.False(active.HasExternalChanges());
+
+        var syncedWriter = new BoardSaveService(Folder);
+        syncedWriter.Load();
+        syncedWriter.Save(new Board { Title = "from other computer" });
+
+        Assert.True(active.HasExternalChanges());
+        string backup = Assert.Single(Directory.GetFiles(FileInTest("Backups"), "board-*.json"));
+        Assert.Contains("first", File.ReadAllText(backup));
+        Assert.Throws<IOException>(() => active.Save(new Board { Title = "stale local edit" }));
+    }
 }

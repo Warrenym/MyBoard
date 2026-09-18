@@ -6,6 +6,7 @@ using MyBoard.Services;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.IO;
 using System.Text;
 
 namespace MyBoard.ViewModel
@@ -33,7 +34,10 @@ namespace MyBoard.ViewModel
         private bool isColorPopoverOpen;
 
 
-        public ColorPaletteViewModel ColorPalette { get; } = new();
+        public ColorPaletteViewModel ColorPalette { get; }
+        public string StorageFolder { get; }
+        public string ImageFolder => Path.Combine(StorageFolder, "Images");
+        public string StorageDisplayText => StorageFolder;
 
 
         partial void OnZoomLevelChanged(double value)
@@ -48,10 +52,13 @@ namespace MyBoard.ViewModel
 
         //Undo and Redo
         public UndoRedoManager UndoRedo { get; } = new();
-        private readonly BoardSaveService boardStorage = new();
+        private readonly BoardSaveService boardStorage;
 
         public MainViewModel()
         {
+            StorageFolder = AppStoragePaths.RootFolder;
+            boardStorage = new BoardSaveService(StorageFolder);
+            ColorPalette = new ColorPaletteViewModel(StorageFolder);
             Board homeBoard = boardStorage.Load() ?? new Board { Title = "Home" };
             currentBoard = new BoardViewModel(homeBoard, UndoRedo); // pass it in here
             BreadcrumbTrail.Add(currentBoard);
@@ -97,6 +104,10 @@ namespace MyBoard.ViewModel
             var rootBoard = BreadcrumbTrail[0].Model; // BreadcrumbTrail[0] is always Home
             boardStorage.Save(rootBoard);
         }
+
+        public void SaveNow() => SaveBoard();
+
+        public bool HasExternalBoardChanges() => boardStorage.HasExternalChanges();
 
 
         // Adds a new note to whichever board is currently displayed

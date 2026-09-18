@@ -104,16 +104,19 @@ This project has become my playground for learning software architecture, WPF, U
 
 ### Data Sync
 
-Board data, custom colors, and managed images are stored in `OneDrive\MyBoard`
-when OneDrive is available. Existing data from `%AppData%\MyBoard` is copied into
-that folder automatically on first launch, without replacing data that is already
-in OneDrive.
+Use **Data location…** in the top bar to choose the exact synced folder on each
+computer. The selection is stored locally per PC, so different Windows usernames
+and OneDrive locations are supported. Selecting an empty folder safely copies the
+current board, palette, images, and backups. Selecting a folder that already has
+`board.json` offers to load that board instead of overwriting it.
 
-If the PC has multiple OneDrive accounts, set the `MYBOARD_DATA_FOLDER`
-environment variable to the same synced folder on each PC. Let OneDrive finish
-syncing before opening MyBoard on the other PC, and avoid editing the board on
-both PCs at the same time because OneDrive cannot merge changes inside
-`board.json`.
+Image paths inside `board.json` are relative to the data folder. MyBoard also
+keeps timestamped backups and detects when OneDrive changes the board while the
+app is open, preventing a stale instance from overwriting newer synced data.
+
+Mark the selected folder as **Always keep on this device**, let OneDrive finish
+syncing before switching computers, and avoid editing the board on both PCs at
+the same time because OneDrive cannot merge simultaneous edits to `board.json`.
 
 ---
 

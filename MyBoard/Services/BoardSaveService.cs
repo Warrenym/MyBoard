@@ -9,6 +9,7 @@ internal sealed class BoardSaveService
 {
     internal const int CurrentVersion = 1;
     private readonly string path;
+    private readonly string storageFolder;
     private readonly Action<string>? beforeCommit;
     private string? loadedContents;
     private bool loaded;
@@ -17,8 +18,16 @@ internal sealed class BoardSaveService
 
     public BoardSaveService(string? storageFolder = null, Action<string>? beforeCommit = null)
     {
-        path = Path.Combine(Path.GetFullPath(storageFolder ?? AppStoragePaths.RootFolder), "board.json");
+        this.storageFolder = Path.GetFullPath(storageFolder ?? AppStoragePaths.RootFolder);
+        path = Path.Combine(this.storageFolder, "board.json");
         this.beforeCommit = beforeCommit;
+    }
+
+    public bool HasExternalChanges()
+    {
+        if (!loaded) return false;
+        string? current = File.Exists(path) ? File.ReadAllText(path) : null;
+        return current != loadedContents;
     }
 
     public Board? Load()
@@ -41,7 +50,9 @@ internal sealed class BoardSaveService
     public void Save(Board rootBoard)
     {
         Validate(rootBoard);
-        var json = JsonSerializer.SerializeToNode(rootBoard, Options)!.AsObject();
+        Board portableBoard = JsonSerializer.Deserialize<Board>(JsonSerializer.Serialize(rootBoard, Options), Options)!;
+        MakeImagePathsPortable(portableBoard);
+        var json = JsonSerializer.SerializeToNode(portableBoard, Options)!.AsObject();
         json["FormatVersion"] = CurrentVersion;
         string contents = json.ToJsonString(Options);
         Directory.CreateDirectory(Path.GetDirectoryName(path)!);
@@ -50,11 +61,20 @@ internal sealed class BoardSaveService
         string? existing = File.Exists(path) ? File.ReadAllText(path) : null;
         if (loaded && existing != loadedContents)
             throw new IOException("The board was changed by another instance. Reload before saving.");
+        if (existing == contents)
+        {
+            loadedContents = contents;
+            loaded = true;
+            recovered = false;
+            return;
+        }
         if (existing is not null && !recovered)
             _ = Deserialize(existing); // Never overwrite an unreadable or future-format save.
         // Preserve the corrupt primary as evidence; never replace the known-good backup with it.
         string backupPath = recovered ? path + ".corrupt." + Guid.NewGuid().ToString("N") : path + ".bak";
         AtomicFile.Write(path, contents, backupPath, beforeCommit);
+        if (existing is not null && !recovered)
+            CreateTimestampedBackup(existing);
         loadedContents = contents;
         loaded = true;
         recovered = false;
@@ -93,13 +113,50 @@ internal sealed class BoardSaveService
                 // Do not resurrect legacy text after the user intentionally empties the document.
                 note.Content = null;
             }
-            else if (item is ImageItem image && !string.IsNullOrWhiteSpace(image.FilePath) && !File.Exists(image.FilePath))
+            else if (item is ImageItem image && !string.IsNullOrWhiteSpace(image.FilePath))
             {
-                string candidate = Path.Combine(Path.GetDirectoryName(path)!, "Images", Path.GetFileName(image.FilePath));
-                if (File.Exists(candidate)) image.FilePath = candidate;
+                string candidate;
+                if (!Path.IsPathRooted(image.FilePath) &&
+                    image.FilePath.StartsWith("Images" + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
+                    candidate = Path.GetFullPath(Path.Combine(storageFolder, image.FilePath));
+                else
+                    candidate = Path.Combine(storageFolder, "Images", Path.GetFileName(image.FilePath));
+
+                if (File.Exists(candidate) || !Path.IsPathRooted(image.FilePath) &&
+                    image.FilePath.StartsWith("Images" + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
+                    image.FilePath = candidate;
             }
             else if (item is Board child) Migrate(child);
         }
+    }
+
+    private void MakeImagePathsPortable(Board board)
+    {
+        string imageFolder = Path.Combine(storageFolder, "Images");
+        foreach (var item in board.Items)
+        {
+            if (item is ImageItem image && !string.IsNullOrWhiteSpace(image.FilePath))
+            {
+                string fullPath = Path.IsPathRooted(image.FilePath)
+                    ? Path.GetFullPath(image.FilePath)
+                    : Path.GetFullPath(Path.Combine(storageFolder, image.FilePath));
+                if (fullPath.StartsWith(imageFolder + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
+                    image.FilePath = Path.Combine("Images", Path.GetFileName(fullPath));
+            }
+            else if (item is Board child) MakeImagePathsPortable(child);
+        }
+    }
+
+    private void CreateTimestampedBackup(string contents)
+    {
+        string backupFolder = Path.Combine(storageFolder, "Backups");
+        Directory.CreateDirectory(backupFolder);
+        string backupPath = Path.Combine(backupFolder, $"board-{DateTime.UtcNow:yyyyMMdd-HHmmss-fff}.json");
+        File.WriteAllText(backupPath, contents);
+
+        foreach (string oldBackup in Directory.EnumerateFiles(backupFolder, "board-*.json")
+                     .OrderByDescending(File.GetCreationTimeUtc).Skip(10))
+            File.Delete(oldBackup);
     }
 
     private static void Validate(Board board)

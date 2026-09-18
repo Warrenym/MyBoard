@@ -49,7 +49,7 @@ namespace MyBoard
             {
                 foreach (var path in files.Where(IsImageFile))
                 {
-                    string saved = ImageStorageService.CopyFile(path);
+                    string saved = ImageStorageService.CopyFile(path, ((MainViewModel)DataContext).ImageFolder);
                     board.AddImage(saved, canvasPosition.X + (importedCount * 20), canvasPosition.Y + (importedCount * 20));
                     importedCount++;
                 }
@@ -60,7 +60,7 @@ namespace MyBoard
             if (data.GetDataPresent(DataFormats.Bitmap) &&
                 data.GetData(DataFormats.Bitmap) is BitmapSource bitmap)
             {
-                string saved = ImageStorageService.SaveBitmap(bitmap);
+                string saved = ImageStorageService.SaveBitmap(bitmap, ((MainViewModel)DataContext).ImageFolder);
                 board.AddImage(saved, canvasPosition.X, canvasPosition.Y);
                 return true;
             }
@@ -71,8 +71,9 @@ namespace MyBoard
                 try
                 {
                     string saved = url.StartsWith("data:image/", StringComparison.OrdinalIgnoreCase)
-                        ? ImageStorageService.SaveDataUri(url)
-                        : await ImageStorageService.DownloadImageAsync(url);
+                        ? ImageStorageService.SaveDataUri(url, ((MainViewModel)DataContext).ImageFolder)
+                        : await ImageStorageService.DownloadImageAsync(
+                            url, ((MainViewModel)DataContext).ImageFolder);
                     board.AddImage(saved, canvasPosition.X, canvasPosition.Y);
                     return true;
                 }
@@ -230,7 +231,7 @@ namespace MyBoard
         private static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint processId);
 
 
-        private void MainWindow_Deactivated(object sender, EventArgs e)
+        private void MainWindow_Deactivated(object? sender, EventArgs e)
         {
             isSpaceHeld = false;
             isPanning = false;

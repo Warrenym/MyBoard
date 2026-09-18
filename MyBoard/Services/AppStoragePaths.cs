@@ -1,92 +1,116 @@
 using System.IO;
+using System.Text.Json;
 
-namespace MyBoard.Services
+namespace MyBoard.Services;
+
+internal static class AppStoragePaths
 {
-    internal static class AppStoragePaths
+    private const string AppFolderName = "MyBoard";
+    private static readonly string LegacyRootFolder = Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), AppFolderName);
+    private static readonly string SettingsFolder = Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), AppFolderName);
+    private static readonly string SettingsPath = Path.Combine(SettingsFolder, "settings.json");
+    private static string rootFolder;
+
+    public static string RootFolder => rootFolder;
+    public static string ImageFolder => Path.Combine(rootFolder, "Images");
+    public static bool HasExplicitSelection { get; private set; }
+
+    static AppStoragePaths()
     {
-        private const string AppFolderName = "MyBoard";
-        private static readonly string LegacyRootFolder = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-            AppFolderName);
+        rootFolder = ResolveRootFolder();
+        Directory.CreateDirectory(rootFolder);
 
-        public static string RootFolder { get; } = ResolveRootFolder();
-        public static string ImageFolder => Path.Combine(RootFolder, "Images");
+        if (!HasExplicitSelection && !PathsEqual(rootFolder, LegacyRootFolder))
+            CopyDataIfMissing(LegacyRootFolder, rootFolder);
+    }
 
-        static AppStoragePaths()
+    public static void SelectRootFolder(string folder)
+    {
+        string fullPath = Normalize(folder);
+        Directory.CreateDirectory(fullPath);
+
+        string json = JsonSerializer.Serialize(
+            new StorageSettings { DataFolder = fullPath },
+            new JsonSerializerOptions { WriteIndented = true });
+        AtomicFile.Write(SettingsPath, json, SettingsPath + ".bak");
+
+        rootFolder = fullPath;
+        HasExplicitSelection = true;
+    }
+
+    public static void CopyDataIfMissing(string sourceFolder, string destinationFolder)
+    {
+        string source = Normalize(sourceFolder);
+        string destination = Normalize(destinationFolder);
+        if (PathsEqual(source, destination) || !Directory.Exists(source)) return;
+        if (IsInside(destination, source) || IsInside(source, destination))
+            throw new IOException("The new data folder cannot be inside the current data folder, or contain it.");
+
+        Directory.CreateDirectory(destination);
+        foreach (string sourcePath in Directory.EnumerateFiles(source, "*", SearchOption.AllDirectories))
         {
-            Directory.CreateDirectory(RootFolder);
+            string extension = Path.GetExtension(sourcePath);
+            if (extension.Equals(".lock", StringComparison.OrdinalIgnoreCase) ||
+                extension.Equals(".tmp", StringComparison.OrdinalIgnoreCase))
+                continue;
 
-            if (!PathsEqual(RootFolder, LegacyRootFolder))
-                MigrateLegacyData();
+            string relativePath = Path.GetRelativePath(source, sourcePath);
+            string destinationPath = Path.Combine(destination, relativePath);
+            if (File.Exists(destinationPath)) continue;
+            Directory.CreateDirectory(Path.GetDirectoryName(destinationPath)!);
+            File.Copy(sourcePath, destinationPath);
+        }
+    }
+
+    private static string ResolveRootFolder()
+    {
+        string? selected = LoadSelectedFolder();
+        if (!string.IsNullOrWhiteSpace(selected))
+        {
+            HasExplicitSelection = true;
+            return Normalize(selected);
         }
 
-        private static string ResolveRootFolder()
+        string? configured = Environment.GetEnvironmentVariable("MYBOARD_DATA_FOLDER");
+        if (!string.IsNullOrWhiteSpace(configured)) return Normalize(configured);
+
+        foreach (string variable in new[] { "OneDrive", "OneDriveConsumer", "OneDriveCommercial" })
         {
-            // This optional override is useful if Windows exposes more than one
-            // OneDrive account and the board should live in a specific one.
-            string? configuredFolder = Environment.GetEnvironmentVariable("MYBOARD_DATA_FOLDER");
-            if (!string.IsNullOrWhiteSpace(configuredFolder))
-                return Path.GetFullPath(Environment.ExpandEnvironmentVariables(configuredFolder));
-
-            // The generic variable normally points at the user's active OneDrive.
-            // The other two cover machines that only expose an account-specific
-            // variable (consumer or work/school).
-            string[] oneDriveVariables = ["OneDrive", "OneDriveConsumer", "OneDriveCommercial"];
-            foreach (string variable in oneDriveVariables)
-            {
-                string? oneDrivePath = Environment.GetEnvironmentVariable(variable);
-                if (!string.IsNullOrWhiteSpace(oneDrivePath) && Directory.Exists(oneDrivePath))
-                    return Path.Combine(oneDrivePath, AppFolderName);
-            }
-
-            // Keep the app usable when OneDrive is not installed or signed in.
-            return LegacyRootFolder;
+            string? oneDrive = Environment.GetEnvironmentVariable(variable);
+            if (!string.IsNullOrWhiteSpace(oneDrive) && Directory.Exists(oneDrive))
+                return Path.Combine(oneDrive, AppFolderName);
         }
 
-        public static string ResolveImagePath(string savedPath)
+        return LegacyRootFolder;
+    }
+
+    private static string? LoadSelectedFolder()
+    {
+        try
         {
-            if (string.IsNullOrWhiteSpace(savedPath) || File.Exists(savedPath))
-                return savedPath;
-
-            // Older saves contain an absolute path from the PC that wrote them.
-            // Image names are GUIDs, so remapping by file name is both portable
-            // and unambiguous inside the synced Images folder.
-            string candidate = Path.Combine(ImageFolder, Path.GetFileName(savedPath));
-            return File.Exists(candidate) ? candidate : savedPath;
+            if (!File.Exists(SettingsPath)) return null;
+            return JsonSerializer.Deserialize<StorageSettings>(File.ReadAllText(SettingsPath))?.DataFolder;
         }
-
-        public static void WriteAllTextAtomically(string path, string contents)
+        catch (JsonException)
         {
-            AtomicFile.Write(path, contents);
+            return null;
         }
+    }
 
-        private static void MigrateLegacyData()
-        {
-            if (!Directory.Exists(LegacyRootFolder))
-                return;
+    private static string Normalize(string path) =>
+        Path.GetFullPath(Environment.ExpandEnvironmentVariables(path))
+            .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
 
-            CopyIfMissing(Path.Combine(LegacyRootFolder, "board.json"), Path.Combine(RootFolder, "board.json"));
-            CopyIfMissing(Path.Combine(LegacyRootFolder, "palette.json"), Path.Combine(RootFolder, "palette.json"));
+    private static bool IsInside(string candidate, string parent) =>
+        candidate.StartsWith(parent + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase);
 
-            string legacyImages = Path.Combine(LegacyRootFolder, "Images");
-            if (!Directory.Exists(legacyImages))
-                return;
+    private static bool PathsEqual(string left, string right) =>
+        string.Equals(Normalize(left), Normalize(right), StringComparison.OrdinalIgnoreCase);
 
-            Directory.CreateDirectory(ImageFolder);
-            foreach (string sourcePath in Directory.EnumerateFiles(legacyImages))
-                CopyIfMissing(sourcePath, Path.Combine(ImageFolder, Path.GetFileName(sourcePath)));
-        }
-
-        private static void CopyIfMissing(string sourcePath, string destinationPath)
-        {
-            if (File.Exists(sourcePath) && !File.Exists(destinationPath))
-                File.Copy(sourcePath, destinationPath);
-        }
-
-        private static bool PathsEqual(string left, string right) =>
-            string.Equals(
-                Path.GetFullPath(left).TrimEnd(Path.DirectorySeparatorChar),
-                Path.GetFullPath(right).TrimEnd(Path.DirectorySeparatorChar),
-                StringComparison.OrdinalIgnoreCase);
+    private sealed class StorageSettings
+    {
+        public string DataFolder { get; set; } = "";
     }
 }

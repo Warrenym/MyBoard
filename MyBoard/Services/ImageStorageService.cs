@@ -73,6 +73,12 @@ namespace MyBoard.Services
             return await DownloadImageAsync(url, httpClient);
         }
 
+        public static async Task<string> DownloadImageAsync(string url, string storageFolder)
+        {
+            using var httpClient = new HttpClient();
+            return await DownloadImageAsync(url, httpClient, storageFolder);
+        }
+
         public static async Task<string> DownloadImageAsync(string url, HttpClient httpClient, string? storageFolder = null)
         {
             byte[] data = await httpClient.GetByteArrayAsync(url);

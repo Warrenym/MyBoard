@@ -34,6 +34,23 @@
 
         <!--Row 0: Home and Breadcrumb-->
         <DockPanel Grid.Row="0" Background="{StaticResource SidebarBrush}" Height="48">
+            <StackPanel DockPanel.Dock="Right"
+                        Orientation="Horizontal"
+                        VerticalAlignment="Center"
+                        Margin="12,0,16,0">
+                <TextBlock Text="{Binding StorageDisplayText}"
+                           Style="{StaticResource CaptionText}"
+                           Width="300"
+                           TextTrimming="CharacterEllipsis"
+                           VerticalAlignment="Center"
+                           ToolTip="{Binding StorageDisplayText}"/>
+                <Button Content="Data location…"
+                        Margin="10,0,0,0"
+                        Padding="10,5"
+                        Click="ChangeDataLocation_Click"
+                        ToolTip="Choose the folder MyBoard uses on this computer"/>
+            </StackPanel>
+
             <ItemsControl ItemsSource="{Binding BreadcrumbTrail}"
                           AlternationCount="{Binding BreadcrumbTrail.Count}"
                           Margin="16,0">
