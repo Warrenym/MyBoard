@@ -241,6 +241,7 @@
                                                          Focusable="{Binding IsEditing}"
                                                          Loaded="NoteRichTextBox_Loaded"
                                                          PreviewKeyDown="NoteRichTextBox_PreviewKeyDown"
+                                                         PreviewMouseLeftButtonDown="NoteRichTextBox_PreviewMouseLeftButtonDown"
                                                          PreviewTextInput="NoteRichTextBox_PreviewTextInput"
                                                          PreviewMouseWheel="NoteRichTextBox_PreviewMouseWheel"
                                                          SelectionChanged="NoteRichTextBox_SelectionChanged">
@@ -517,6 +518,8 @@
                                                                        PopoverOpened="NoteDesignTool_PopoverOpened"
                                                                        PopoverClosed="NoteDesignTool_PopoverClosed"/>
 
+                                            <Separator/>
+
                                             <!-- Formatting row 1: character styles -->
                                             <StackPanel>
                                                 <ToggleButton x:Name="BoldToggle" HorizontalAlignment="Stretch" Style="{StaticResource FormatToggleButtonStyle}" Click="FormatToggle_Click" Loaded="FormatToggle_Loaded" Tag="Bold">
@@ -547,6 +550,32 @@
                                                     <StackPanel Orientation="Horizontal">
                                                         <TextBlock Text="S" TextDecorations="Strikethrough" FontSize="{StaticResource SidebarIconSize}" Width="30" TextAlignment="Center" VerticalAlignment="Center"/>
                                                         <TextBlock Text="Strikethrough" Style="{StaticResource BodyText}" Margin="10,0,0,0" VerticalAlignment="Center"
+                                                                   Visibility="{Binding IsSidebarExpanded, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource BoolToVis}}"/>
+                                                    </StackPanel>
+                                                </ToggleButton>
+
+                                                <Separator/>
+
+                                                <ToggleButton x:Name="BulletToggle" HorizontalAlignment="Stretch" Style="{StaticResource FormatToggleButtonStyle}" Click="FormatToggle_Click" Loaded="FormatToggle_Loaded" Tag="Bullet">
+                                                    <StackPanel Orientation="Horizontal">
+                                                        <TextBlock Text="•" FontSize="{StaticResource SidebarIconSize}" Width="30" TextAlignment="Center" VerticalAlignment="Center"/>
+                                                        <TextBlock Text="Bullet" Style="{StaticResource BodyText}" Margin="10,0,0,0" VerticalAlignment="Center"
+                                                                   Visibility="{Binding IsSidebarExpanded, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource BoolToVis}}"/>
+                                                    </StackPanel>
+                                                </ToggleButton>
+
+                                                <ToggleButton x:Name="NumberedToggle" HorizontalAlignment="Stretch" Style="{StaticResource FormatToggleButtonStyle}" Click="FormatToggle_Click" Loaded="FormatToggle_Loaded" Tag="Numbered">
+                                                    <StackPanel Orientation="Horizontal">
+                                                        <TextBlock Text="1." FontSize="{StaticResource SidebarIconSize}" Width="30" TextAlignment="Center" VerticalAlignment="Center"/>
+                                                        <TextBlock Text="Numbered" Style="{StaticResource BodyText}" Margin="10,0,0,0" VerticalAlignment="Center"
+                                                                   Visibility="{Binding IsSidebarExpanded, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource BoolToVis}}"/>
+                                                    </StackPanel>
+                                                </ToggleButton>
+
+                                                <ToggleButton x:Name="CheckboxToggle" HorizontalAlignment="Stretch" Style="{StaticResource FormatToggleButtonStyle}" Click="FormatToggle_Click" Loaded="FormatToggle_Loaded" Tag="Checkbox">
+                                                    <StackPanel Orientation="Horizontal">
+                                                        <TextBlock Text="☐" FontSize="{StaticResource SidebarIconSize}" Width="30" TextAlignment="Center" VerticalAlignment="Center"/>
+                                                        <TextBlock Text="Checkbox" Style="{StaticResource BodyText}" Margin="10,0,0,0" VerticalAlignment="Center"
                                                                    Visibility="{Binding IsSidebarExpanded, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource BoolToVis}}"/>
                                                     </StackPanel>
                                                 </ToggleButton>

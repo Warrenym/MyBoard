@@ -31,6 +31,9 @@ namespace MyBoard
         private ToggleButton? italicToggleRef;
         private ToggleButton? underlineToggleRef;
         private ToggleButton? strikeToggleRef;
+        private ToggleButton? bulletToggleRef;
+        private ToggleButton? numberedToggleRef;
+        private ToggleButton? checkboxToggleRef;
 
         private void FormatToggle_Loaded(object sender, RoutedEventArgs e)
         {
@@ -42,6 +45,9 @@ namespace MyBoard
                 case "Italic": italicToggleRef = toggle; break;
                 case "Underline": underlineToggleRef = toggle; break;
                 case "Strikethrough": strikeToggleRef = toggle; break;
+                case "Bullet": bulletToggleRef = toggle; break;
+                case "Numbered": numberedToggleRef = toggle; break;
+                case "Checkbox": checkboxToggleRef = toggle; break;
             }
         }
 
@@ -78,6 +84,11 @@ namespace MyBoard
                 ? pendingStrikethroughState!.Value
                 : HasDecoration(selection, TextDecorations.Strikethrough);
             SetToggleState("StrikeToggle", strikeActive);
+
+            var listType = GetCurrentListType(rtb);
+            SetToggleState("BulletToggle", listType == Model.NoteListType.Bullet);
+            SetToggleState("NumberedToggle", listType == Model.NoteListType.Numbered);
+            SetToggleState("CheckboxToggle", listType == Model.NoteListType.Checkbox);
         }
 
         private static bool HasDecoration(TextSelection selection, TextDecorationCollection target)
@@ -99,6 +110,9 @@ namespace MyBoard
                 "ItalicToggle" => italicToggleRef,
                 "UnderlineToggle" => underlineToggleRef,
                 "StrikeToggle" => strikeToggleRef,
+                "BulletToggle" => bulletToggleRef,
+                "NumberedToggle" => numberedToggleRef,
+                "CheckboxToggle" => checkboxToggleRef,
                 _ => null
             };
 
@@ -136,9 +150,154 @@ namespace MyBoard
                 case "Strikethrough":
                     ToggleStrikethrough(activeFormattingTarget);
                     break;
+
+                case "Bullet":
+                    ApplyListFormat(activeFormattingTarget, Model.NoteListType.Bullet);
+                    break;
+
+                case "Numbered":
+                    ApplyListFormat(activeFormattingTarget, Model.NoteListType.Numbered);
+                    break;
+
+                case "Checkbox":
+                    ApplyListFormat(activeFormattingTarget, Model.NoteListType.Checkbox);
+                    break;
             }
 
+            NoteRichTextBox_RefreshFormatState(activeFormattingTarget);
             activeFormattingTarget.Focus();
+        }
+
+        private static System.Windows.Documents.List? GetCurrentList(RichTextBox rtb) =>
+            rtb.CaretPosition.Paragraph?.Parent is ListItem item
+                ? item.Parent as System.Windows.Documents.List
+                : null;
+
+        private static Model.NoteListType? GetCurrentListType(RichTextBox rtb)
+        {
+            var list = GetCurrentList(rtb);
+            if (list == null) return null;
+            if (list.MarkerStyle == TextMarkerStyle.Decimal) return Model.NoteListType.Numbered;
+
+            var paragraph = rtb.CaretPosition.Paragraph;
+            if (paragraph?.Inlines.FirstInline is Run { Tag: Services.NoteDocumentConverter.ChecklistGlyphTag })
+                return Model.NoteListType.Checkbox;
+
+            return Model.NoteListType.Bullet;
+        }
+
+        private void ApplyListFormat(RichTextBox rtb, Model.NoteListType requestedType)
+        {
+            var currentType = GetCurrentListType(rtb);
+            var currentList = GetCurrentList(rtb);
+
+            if (currentType == requestedType && currentList != null)
+            {
+                RemoveCheckboxes(currentList);
+                currentList.MarkerStyle = requestedType == Model.NoteListType.Numbered
+                    ? TextMarkerStyle.Decimal
+                    : TextMarkerStyle.Disc;
+
+                var command = requestedType == Model.NoteListType.Numbered
+                    ? EditingCommands.ToggleNumbering
+                    : EditingCommands.ToggleBullets;
+                command.Execute(null, rtb);
+                return;
+            }
+
+            if (currentList == null)
+            {
+                var command = requestedType == Model.NoteListType.Numbered
+                    ? EditingCommands.ToggleNumbering
+                    : EditingCommands.ToggleBullets;
+                command.Execute(null, rtb);
+                currentList = GetCurrentList(rtb);
+            }
+
+            if (currentList == null) return;
+
+            RemoveCheckboxes(currentList);
+            currentList.MarkerStyle = requestedType switch
+            {
+                Model.NoteListType.Numbered => TextMarkerStyle.Decimal,
+                Model.NoteListType.Checkbox => TextMarkerStyle.None,
+                _ => TextMarkerStyle.Disc
+            };
+
+            if (requestedType == Model.NoteListType.Checkbox)
+                AddCheckboxes(currentList);
+        }
+
+        private void AddCheckboxes(System.Windows.Documents.List list)
+        {
+            // WPF invalidates its live TextElement enumerator when any nested
+            // inline is changed, so snapshot the items before editing them.
+            var items = list.ListItems.Cast<ListItem>().ToArray();
+            foreach (var item in items)
+            {
+                if (item.Blocks.FirstBlock is not Paragraph paragraph) continue;
+                if (paragraph.Inlines.FirstInline is Run { Tag: Services.NoteDocumentConverter.ChecklistGlyphTag }) continue;
+
+                var checkbox = CreateChecklistGlyphRun();
+
+                if (paragraph.Inlines.FirstInline is Inline firstInline)
+                    paragraph.Inlines.InsertBefore(firstInline, checkbox);
+                else
+                    paragraph.Inlines.Add(checkbox);
+            }
+        }
+
+        private static Run CreateChecklistGlyphRun(bool isChecked = false) => new(isChecked ? "☑ " : "☐ ")
+        {
+            Tag = Services.NoteDocumentConverter.ChecklistGlyphTag,
+            FontFamily = new System.Windows.Media.FontFamily("Segoe UI Symbol"),
+            FontSize = 16,
+            Cursor = Cursors.Hand,
+            TextDecorations = new TextDecorationCollection()
+        };
+
+        private static void RemoveCheckboxes(System.Windows.Documents.List list)
+        {
+            var items = list.ListItems.Cast<ListItem>().ToArray();
+            foreach (var item in items)
+            {
+                if (item.Blocks.FirstBlock is not Paragraph paragraph) continue;
+                if (paragraph.Inlines.FirstInline is Run { Tag: Services.NoteDocumentConverter.ChecklistGlyphTag } checkbox)
+                    paragraph.Inlines.Remove(checkbox);
+            }
+        }
+
+        private static void SetChecklistItemStrikethrough(Paragraph paragraph, bool isChecked)
+        {
+            foreach (var run in paragraph.Inlines.OfType<Run>())
+            {
+                if (run.Tag as string == Services.NoteDocumentConverter.ChecklistGlyphTag)
+                    continue;
+
+                // Keep an explicit empty collection when unchecked. A null
+                // value would inherit strikethrough from the prior typing run.
+                run.TextDecorations = WithoutStrikethrough(run.TextDecorations, isChecked);
+            }
+        }
+
+        private static TextDecorationCollection WithoutStrikethrough(
+            TextDecorationCollection? existing,
+            bool isChecked)
+        {
+            var updated = new TextDecorationCollection();
+            if (existing != null)
+            {
+                foreach (var decoration in existing)
+                {
+                    if (decoration.Location != TextDecorations.Strikethrough[0].Location)
+                        updated.Add(decoration.Clone());
+                }
+            }
+
+            if (isChecked)
+                updated.Add(TextDecorations.Strikethrough[0].Clone());
+
+            return updated;
         }
 
         // Strikethrough has no built-in EditingCommand, so we toggle it
@@ -170,6 +329,7 @@ namespace MyBoard
         private void NoteRichTextBox_TextChanged(object sender, TextChangedEventArgs e)
         {
             if (sender is not RichTextBox rtb) return;
+
             if (pendingStrikethroughTarget != rtb || pendingStrikethroughState is not bool wantStrike) return;
             if (!strikethroughTypingInProgress) return; // only apply for actual typed input
 

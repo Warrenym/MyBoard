@@ -24,6 +24,38 @@ namespace MyBoard
             e.Handled = true;
         }
 
+        private void NoteRichTextBox_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+        {
+            if (sender is not RichTextBox rtb) return;
+
+            var mousePosition = e.GetPosition(rtb);
+            var textPosition = rtb.GetPositionFromPoint(mousePosition, true);
+            var paragraph = textPosition?.Paragraph;
+            if (paragraph?.Inlines.FirstInline is not Run
+                {
+                    Tag: NoteDocumentConverter.ChecklistGlyphTag
+                } glyph) return;
+
+            var startRect = glyph.ContentStart.GetCharacterRect(LogicalDirection.Forward);
+            var endRect = glyph.ContentEnd.GetCharacterRect(LogicalDirection.Backward);
+            var glyphBounds = new Rect(
+                startRect.Left - 3,
+                Math.Min(startRect.Top, endRect.Top) - 2,
+                Math.Max(18, endRect.Right - startRect.Left + 6),
+                Math.Max(startRect.Height, endRect.Height) + 4);
+
+            if (!glyphBounds.Contains(mousePosition)) return;
+
+            bool isNowChecked = !glyph.Text.StartsWith('☑');
+            glyph.Text = isNowChecked ? "☑ " : "☐ ";
+            SetChecklistItemStrikethrough(paragraph, isNowChecked);
+
+            if (rtb.DataContext is NoteItemViewModel note)
+                note.Document = NoteDocumentConverter.ToNoteDocument(rtb.Document);
+
+            e.Handled = true;
+        }
+
 
         private void NoteDesignTool_AboutToOpen(object? sender, EventArgs e)
         {
@@ -154,6 +186,63 @@ namespace MyBoard
             // Shift+Enter: let WPF's default line-break behavior happen untouched — this preserves the current block's style
             if (e.Key == Key.Enter && Keyboard.Modifiers == ModifierKeys.Shift)
                 return;
+
+            // Lists keep WPF's native Enter behavior so a new item is
+            // continued and an empty item exits the list. Checklist items
+            // receive a new interactive checkbox after that command runs.
+            if (e.Key == Key.Enter && Keyboard.Modifiers == ModifierKeys.None &&
+                currentParagraph.Parent is ListItem currentItem &&
+                currentItem.Parent is System.Windows.Documents.List currentList)
+            {
+                bool isCheckboxList = currentList.MarkerStyle == TextMarkerStyle.None &&
+                    currentParagraph.Inlines.FirstInline is Run
+                    {
+                        Tag: NoteDocumentConverter.ChecklistGlyphTag
+                    };
+
+                if (isCheckboxList)
+                {
+                    bool hasText = currentParagraph.Inlines
+                        .OfType<Run>()
+                        .Any(run => run.Tag as string != NoteDocumentConverter.ChecklistGlyphTag &&
+                                    !string.IsNullOrWhiteSpace(run.Text));
+
+                    // An unchecked UI element makes WPF consider the item
+                    // non-empty. Remove it first so Enter on a blank checklist
+                    // item can still exit the list normally.
+                    if (!hasText && currentParagraph.Inlines.FirstInline is Run checkbox)
+                    {
+                        currentParagraph.Inlines.Remove(checkbox);
+                        return;
+                    }
+
+                    e.Handled = true;
+
+                    var caret = rtb.CaretPosition;
+                    var afterRange = new TextRange(caret, currentParagraph.ContentEnd);
+                    string afterText = afterRange.Text.TrimEnd('\r', '\n');
+                    afterRange.Text = "";
+
+                    var contentRun = new Run(afterText)
+                    {
+                        TextDecorations = new TextDecorationCollection()
+                    };
+                    var newParagraph = new Paragraph
+                    {
+                        Margin = NoteDocumentConverter.ParagraphSpacing,
+                        TextDecorations = new TextDecorationCollection()
+                    };
+                    newParagraph.Inlines.Add(CreateChecklistGlyphRun());
+                    newParagraph.Inlines.Add(contentRun);
+
+                    var newItem = new ListItem(newParagraph);
+                    currentList.ListItems.InsertAfter(currentItem, newItem);
+                    rtb.CaretPosition = contentRun.ContentStart;
+                    NoteRichTextBox_RefreshFormatState(rtb);
+                }
+
+                return;
+            }
 
             // Plain Enter: take full manual control — split the text at the caret, create a new paragraph, and style it explicitly
             if (e.Key == Key.Enter && Keyboard.Modifiers == ModifierKeys.None)

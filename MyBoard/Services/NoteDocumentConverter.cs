@@ -4,6 +4,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Documents;
 using System.Windows.Media;
+using DocumentList = System.Windows.Documents.List;
 
 namespace MyBoard.Services
 {
@@ -12,6 +13,7 @@ namespace MyBoard.Services
     // only this converter needs replacing; the data model and ViewModels stay as-is.
     public static class NoteDocumentConverter
     {
+        public const string ChecklistGlyphTag = "ChecklistGlyph";
 
         // ---------- NoteDocument -> FlowDocument (for display/editing) ----------
 
@@ -19,8 +21,30 @@ namespace MyBoard.Services
         {
             var flowDoc = new FlowDocument();
 
-            foreach (var block in document.Blocks)
-                flowDoc.Blocks.Add(BuildParagraph(block));
+            for (int i = 0; i < document.Blocks.Count;)
+            {
+                var block = document.Blocks[i];
+                if (block.ListType is not NoteListType listType)
+                {
+                    flowDoc.Blocks.Add(BuildParagraph(block));
+                    i++;
+                    continue;
+                }
+
+                var list = new DocumentList
+                {
+                    MarkerStyle = GetMarkerStyle(listType),
+                    Margin = ParagraphSpacing
+                };
+
+                while (i < document.Blocks.Count && document.Blocks[i].ListType == listType)
+                {
+                    list.ListItems.Add(new ListItem(BuildParagraph(document.Blocks[i])));
+                    i++;
+                }
+
+                flowDoc.Blocks.Add(list);
+            }
 
             return flowDoc;
         }
@@ -32,8 +56,30 @@ namespace MyBoard.Services
             var paragraph = new Paragraph { Margin = ParagraphSpacing };
             ApplyBlockStyle(paragraph, block.Type);
 
+            if (block.ListType == NoteListType.Checkbox)
+            {
+                paragraph.Inlines.Add(new Run(block.IsChecked ? "☑ " : "☐ ")
+                {
+                    Tag = ChecklistGlyphTag,
+                    FontFamily = new FontFamily("Segoe UI Symbol"),
+                    FontSize = 16,
+                    Cursor = System.Windows.Input.Cursors.Hand
+                });
+            }
+
             foreach (var run in block.Runs)
-                paragraph.Inlines.Add(BuildRun(run));
+            {
+                var builtRun = BuildRun(run);
+                if (block.ListType == NoteListType.Checkbox && block.IsChecked &&
+                    !(builtRun.TextDecorations?.Contains(TextDecorations.Strikethrough[0]) ?? false))
+                {
+                    var decorations = builtRun.TextDecorations?.Clone() ?? new TextDecorationCollection();
+                    decorations.Add(TextDecorations.Strikethrough[0]);
+                    builtRun.TextDecorations = decorations;
+                }
+
+                paragraph.Inlines.Add(builtRun);
+            }
 
             // Blocks with no runs yet (a brand-new empty line) still need
             // SOME inline, or WPF won't render an empty line with the
@@ -183,8 +229,23 @@ namespace MyBoard.Services
 
             foreach (var block in flowDoc.Blocks)
             {
-                if (block is not Paragraph paragraph) continue;
-                document.Blocks.Add(ExtractBlock(paragraph));
+                if (block is Paragraph paragraph)
+                {
+                    document.Blocks.Add(ExtractBlock(paragraph));
+                    continue;
+                }
+
+                if (block is not DocumentList list) continue;
+
+                var listType = GetListType(list);
+                foreach (var item in list.ListItems)
+                {
+                    foreach (var itemBlock in item.Blocks)
+                    {
+                        if (itemBlock is Paragraph itemParagraph)
+                            document.Blocks.Add(ExtractBlock(itemParagraph, listType));
+                    }
+                }
             }
 
             if (document.Blocks.Count == 0)
@@ -193,16 +254,23 @@ namespace MyBoard.Services
             return document;
         }
 
-        private static NoteBlock ExtractBlock(Paragraph paragraph)
+        private static NoteBlock ExtractBlock(Paragraph paragraph, NoteListType? listType = null)
         {
             var block = new NoteBlock
             {
                 Type = DetectBlockType(paragraph),
+                ListType = listType,
                 Runs = new List<NoteRun>()
             };
 
             foreach (var inline in paragraph.Inlines)
             {
+                if (inline is Run { Tag: ChecklistGlyphTag } glyph)
+                {
+                    block.IsChecked = glyph.Text.StartsWith('☑');
+                    continue;
+                }
+
                 if (inline is not Run run) continue;
                 if (string.IsNullOrEmpty(run.Text)) continue; // skip the empty placeholder Run
 
@@ -218,6 +286,25 @@ namespace MyBoard.Services
             }
 
             return block;
+        }
+
+        private static TextMarkerStyle GetMarkerStyle(NoteListType listType) => listType switch
+        {
+            NoteListType.Numbered => TextMarkerStyle.Decimal,
+            NoteListType.Checkbox => TextMarkerStyle.None,
+            _ => TextMarkerStyle.Disc
+        };
+
+        private static NoteListType GetListType(DocumentList list)
+        {
+            if (list.MarkerStyle == TextMarkerStyle.Decimal)
+                return NoteListType.Numbered;
+
+            var firstParagraph = list.ListItems.FirstListItem?.Blocks.FirstBlock as Paragraph;
+            if (firstParagraph?.Inlines.FirstInline is Run { Tag: ChecklistGlyphTag })
+                return NoteListType.Checkbox;
+
+            return NoteListType.Bullet;
         }
 
         // Reverse-maps a Paragraph's visual properties back to a block type —

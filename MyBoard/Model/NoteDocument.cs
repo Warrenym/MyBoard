@@ -15,6 +15,13 @@ namespace MyBoard.Model
         QuoteBlock
     }
 
+    public enum NoteListType
+    {
+        Bullet,
+        Numbered,
+        Checkbox
+    }
+
     // A single span of text with its own formatting — multiple runs make up one block, e.g. "This is " (plain) + "bold" (bold) + " text" (plain)
     public class NoteRun
     {
@@ -39,8 +46,10 @@ namespace MyBoard.Model
         public NoteBlockType Type { get; set; } = NoteBlockType.Normal;
         public List<NoteRun> Runs { get; set; } = new();
 
-        // True for CodeBlock/QuoteBlock/etc. where a bullet/number prefix
-        // doesn't apply — reserved for when list support is added later
+        public NoteListType? ListType { get; set; }
+        public bool IsChecked { get; set; }
+
+        // Kept for compatibility with notes saved by older builds.
         public int? ListIndex { get; set; }
     }
 
