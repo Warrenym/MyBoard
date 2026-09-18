@@ -72,18 +72,24 @@ namespace MyBoard
         // Deletes/Undo/Redo/Cut/Copy/Paste/Duplicate/Rename shortcuts, and Escape for the color popover
         private async void MainWindow_PreviewKeyDown(object sender, KeyEventArgs e)
         {
+            if (e.Handled) return;
             bool isTyping = Keyboard.FocusedElement is TextBox || Keyboard.FocusedElement is RichTextBox;
+            bool canvasShortcut = Services.EditingPolicy.CanHandleCanvasShortcut(isTyping, e.Handled);
             var board = ((MainViewModel)DataContext).CurrentBoard;
             var viewModel = (MainViewModel)DataContext;
 
-            if (e.Key == Key.Delete && !isTyping)
+            if (e.Key == Key.Delete && canvasShortcut)
+            {
                 board.DeleteSelectedItems();
+                e.Handled = true;
+            }
 
             if (e.Key == Key.S && Keyboard.Modifiers == ModifierKeys.Control)
                 viewModel.SaveBoardCommand.Execute(null);
 
-            if (!isTyping && Keyboard.Modifiers == ModifierKeys.Control)
+            if (canvasShortcut && Keyboard.Modifiers == ModifierKeys.Control)
             {
+                if (Services.EditingPolicy.IsCanvasControlShortcut(e.Key)) e.Handled = true;
                 switch (e.Key)
                 {
                     case Key.Z: viewModel.UndoCommand.Execute(null); break;
@@ -98,11 +104,12 @@ namespace MyBoard
                 }
             }
 
-            if (e.Key == Key.F2 && !isTyping &&
-                board.SelectedItems.Count == 1 &&
+            if (e.Key == Key.F2 && canvasShortcut &&
+                Services.EditingPolicy.CanRename(board.SelectedItems.Count, board.PrimarySelectedItem is BoardViewModel) &&
                 board.SelectedItems[0] is BoardViewModel boardToRename)
             {
                 boardToRename.BeginEditingTitle();
+                e.Handled = true;
             }
 
             if (e.Key == Key.Escape)

@@ -256,9 +256,7 @@ namespace MyBoard
                 var currentType = Services.NoteDocumentConverter.DetectBlockTypePublic(paragraph);
 
                 // Quote Block is excluded from the reset — Enter inside a quote just continues as another quote line
-                var targetType = currentType == Model.NoteBlockType.QuoteBlock
-                    ? Model.NoteBlockType.QuoteBlock
-                    : Model.NoteBlockType.Normal;
+                var targetType = EditingPolicy.BlockAfterEnter(currentType);
 
                 var afterRange = new TextRange(caret, paragraph.ContentEnd);
                 string afterText = afterRange.Text.TrimEnd('\r', '\n');

@@ -48,5 +48,7 @@ namespace MyBoard.ViewModel
         partial void OnYChanged(double value) => Model.Y = value;
         partial void OnWidthChanged(double value) => Model.Width = value;
         partial void OnHeightChanged(double value) => Model.Height = value;
+        partial void OnFilePathChanged(string value) => Model.FilePath = value;
+        partial void OnAspectRatioChanged(double value) => Model.AspectRatio = value;
     }
 }

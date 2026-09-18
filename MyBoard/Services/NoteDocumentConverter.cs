@@ -91,7 +91,7 @@ namespace MyBoard.Services
         }
 
 
-        private static Run BuildRun(NoteRun run)
+        private static Inline BuildRun(NoteRun run)
         {
             var r = new Run(run.Text)
             {
@@ -111,6 +111,8 @@ namespace MyBoard.Services
             if (run.HighlightColorKey != null && run.HighlightColorKey != "none")
                 r.Background = NoteColorPalette.GetHighlightBrush(run.HighlightColorKey);
 
+            if (Uri.TryCreate(run.LinkUrl, UriKind.Absolute, out var uri))
+                return new Hyperlink(r) { NavigateUri = uri, TextDecorations = null };
             return r;
         }
 
@@ -271,21 +273,43 @@ namespace MyBoard.Services
                     continue;
                 }
 
-                if (inline is not Run run) continue;
-                if (string.IsNullOrEmpty(run.Text)) continue; // skip the empty placeholder Run
-
-                block.Runs.Add(new NoteRun
-                {
-                    Text = run.Text,
-                    Bold = run.FontWeight == FontWeights.Bold,
-                    Italic = run.FontStyle == FontStyles.Italic,
-                    Strikethrough = run.TextDecorations?.Contains(TextDecorations.Strikethrough[0]) ?? false,
-                    Underline = run.TextDecorations?.Contains(TextDecorations.Underline[0]) ?? false,
-                    InlineCode = run.FontFamily?.Source == "Consolas" && paragraph.FontFamily?.Source != "Consolas"
-                });
+                ExtractInline(inline, block.Runs);
             }
 
             return block;
+        }
+
+        private static void ExtractInline(Inline inline, List<NoteRun> runs, string? link = null)
+        {
+            if (inline is Span span)
+            {
+                foreach (var child in span.Inlines)
+                    ExtractInline(child, runs, (span as Hyperlink)?.NavigateUri?.OriginalString ?? link);
+                return;
+            }
+            string? text = inline switch { Run run => run.Text, LineBreak => "\n", _ => null };
+            if (string.IsNullOrEmpty(text)) return;
+            runs.Add(new NoteRun
+            {
+                Text = text,
+                Bold = inline.FontWeight == FontWeights.Bold,
+                Italic = inline.FontStyle == FontStyles.Italic,
+                Strikethrough = inline.TextDecorations?.Contains(TextDecorations.Strikethrough[0]) ?? false,
+                Underline = inline.TextDecorations?.Contains(TextDecorations.Underline[0]) ?? false,
+                InlineCode = inline.ReadLocalValue(TextElement.FontFamilyProperty) is FontFamily { Source: "Consolas" },
+                TextColorKey = FindColorKey(inline.Foreground, NoteColorPalette.TextColors, "default"),
+                HighlightColorKey = FindColorKey(inline.Background, NoteColorPalette.HighlightColors, "none"),
+                LinkUrl = link
+            });
+        }
+
+        private static string? FindColorKey(Brush? brush, Dictionary<string, string> palette, string defaultKey)
+        {
+            if (brush is not SolidColorBrush solid) return null;
+            foreach (var (key, value) in palette)
+                if ((Color)ColorConverter.ConvertFromString(value) == solid.Color)
+                    return key == defaultKey ? null : key;
+            return null;
         }
 
         private static TextMarkerStyle GetMarkerStyle(NoteListType listType) => listType switch

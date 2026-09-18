@@ -114,8 +114,7 @@ namespace MyBoard
 
         private static bool IsImageFile(string path)
         {
-            string ext = System.IO.Path.GetExtension(path).ToLowerInvariant();
-            return ext is ".png" or ".jpg" or ".jpeg" or ".gif" or ".bmp" or ".webp";
+            return ImageStorageService.IsSupportedImage(path);
         }
 
         private static string? ExtractImageUrl(IDataObject data)
@@ -151,14 +150,14 @@ namespace MyBoard
             double oldZoom = viewModel.ZoomLevel;
 
             double change = e.Delta > 0 ? 0.1 : -0.1;
-            double newZoom = Math.Clamp(oldZoom + change, 0.4, 3.0);
+            double newZoom = CanvasCoordinateService.ClampZoom(oldZoom + change);
 
             if (newZoom == oldZoom) { e.Handled = true; return; }
 
-            Point canvasPoint = CanvasCoordinateService.ScreenToCanvas(mousePos, viewModel.PanX, viewModel.PanY, oldZoom);
+            Point pan = CanvasCoordinateService.PanForZoom(mousePos, viewModel.PanX, viewModel.PanY, oldZoom, newZoom);
             viewModel.ZoomLevel = newZoom;
-            viewModel.PanX = mousePos.X - (canvasPoint.X * newZoom);
-            viewModel.PanY = mousePos.Y - (canvasPoint.Y * newZoom);
+            viewModel.PanX = pan.X;
+            viewModel.PanY = pan.Y;
 
             e.Handled = true;
         }
@@ -180,17 +179,10 @@ namespace MyBoard
                 resizeStartHeight = resizable.Height;
             }
 
-            // Images resize proportionally
-            if (thumb.DataContext is ImageItemViewModel image && image.AspectRatio > 0)
-            {
-                double newWidth = Math.Max(60, image.Width + e.HorizontalChange);
-                image.Width = newWidth;
-                image.Height = newWidth / image.AspectRatio;
-                return;
-            }
-
-            resizable.Width = Math.Max(60, resizable.Width + e.HorizontalChange);
-            resizable.Height = Math.Max(40, resizable.Height + e.VerticalChange);
+            var size = CanvasCoordinateService.Resize(resizable.Width, resizable.Height,
+                e.HorizontalChange, e.VerticalChange, (thumb.DataContext as ImageItemViewModel)?.AspectRatio);
+            resizable.Width = size.Width;
+            resizable.Height = size.Height;
         }
 
 
@@ -292,12 +284,10 @@ namespace MyBoard
                 Point currentPos = e.GetPosition(CanvasViewport);
                 didDrag = true;
 
-                double left = Math.Min(selectionStartPoint.X, currentPos.X);
-                double top = Math.Min(selectionStartPoint.Y, currentPos.Y);
-
-                SelectionBox.Margin = new Thickness(left, top, 0, 0);
-                SelectionBox.Width = Math.Abs(currentPos.X - selectionStartPoint.X);
-                SelectionBox.Height = Math.Abs(currentPos.Y - selectionStartPoint.Y);
+                Rect bounds = CanvasCoordinateService.SelectionBounds(selectionStartPoint, currentPos);
+                SelectionBox.Margin = new Thickness(bounds.Left, bounds.Top, 0, 0);
+                SelectionBox.Width = bounds.Width;
+                SelectionBox.Height = bounds.Height;
                 SelectionBox.Visibility = Visibility.Visible;
             }
         }

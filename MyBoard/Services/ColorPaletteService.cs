@@ -10,20 +10,19 @@ namespace MyBoard.Services
     // Persists the user's custom palette (Saved + Recently Picked) to a single app-wide JSON file
     static class ColorPaletteService
     {
-        private static readonly string SaveFolder = AppStoragePaths.RootFolder;
-
-        private static readonly string SaveFilePath = Path.Combine(SaveFolder, "palette.json");
+        private static string SaveFilePath(string? folder) => Path.Combine(folder ?? AppStoragePaths.RootFolder, "palette.json");
 
         private static readonly JsonSerializerOptions Options = new() { WriteIndented = true };
 
-        public static ColorPaletteData Load()
+        public static ColorPaletteData Load(string? storageFolder = null)
         {
-            if (!File.Exists(SaveFilePath))
+            string path = SaveFilePath(storageFolder);
+            if (!File.Exists(path))
                 return new ColorPaletteData();
 
             try
             {
-                string json = File.ReadAllText(SaveFilePath);
+                string json = File.ReadAllText(path);
                 return JsonSerializer.Deserialize<ColorPaletteData>(json, Options) ?? new ColorPaletteData();
             }
             catch
@@ -33,10 +32,10 @@ namespace MyBoard.Services
             }
         }
 
-        public static void Save(ColorPaletteData data)
+        public static void Save(ColorPaletteData data, string? storageFolder = null)
         {
             string json = JsonSerializer.Serialize(data, Options);
-            AppStoragePaths.WriteAllTextAtomically(SaveFilePath, json);
+            AtomicFile.Write(SaveFilePath(storageFolder), json);
         }
     }
 }

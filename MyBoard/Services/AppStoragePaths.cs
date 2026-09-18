@@ -57,11 +57,7 @@ namespace MyBoard.Services
 
         public static void WriteAllTextAtomically(string path, string contents)
         {
-            Directory.CreateDirectory(Path.GetDirectoryName(path)!);
-            string temporaryPath = path + ".tmp";
-
-            File.WriteAllText(temporaryPath, contents);
-            File.Move(temporaryPath, path, overwrite: true);
+            AtomicFile.Write(path, contents);
         }
 
         private static void MigrateLegacyData()

@@ -155,7 +155,7 @@ namespace MyBoard.ViewModel
                 var bitmap = new System.Windows.Media.Imaging.BitmapImage();
                 bitmap.BeginInit();
                 bitmap.UriSource = new Uri(filePath);
-                bitmap.CacheOption = System.Windows.Media.Imaging.BitmapCacheOption.None;
+                bitmap.CacheOption = System.Windows.Media.Imaging.BitmapCacheOption.OnLoad;
                 
                 bitmap.EndInit();
 
@@ -195,11 +195,12 @@ namespace MyBoard.ViewModel
         // Used by the drag-box multi-select.
         public void SelectItems(IEnumerable<object> items)
         {
+            var selection = items.Distinct().ToList();
             foreach (var existing in Items.OfType<ISelectable>())
                 existing.IsSelected = false;
             SelectedItems.Clear();
 
-            foreach (var item in items)
+            foreach (var item in selection)
             {
                 if (item is ISelectable selectable)
                     selectable.IsSelected = true;
@@ -218,6 +219,7 @@ namespace MyBoard.ViewModel
             SelectedItems.Clear();
 
             PrimarySelectedItem = null;
+            SelectedItem = null;
         }
 
 
@@ -230,6 +232,7 @@ namespace MyBoard.ViewModel
                         .Select(vm => (vm.Model, (object)vm))
                         .ToList();
 
+            ClearSelection();
             if (removed.Count > 0)
                 undoRedo.Do(new DeleteItemsCommand(Model.Items, Items, removed));
 
@@ -275,6 +278,7 @@ namespace MyBoard.ViewModel
             foreach (var clipboardModel in ClipboardService.Items)
             {
                 var clone = CanvasItemClonerService.Clone(clipboardModel);
+                if (clone is Board pastedBoard) pastedBoard.ParentBoardId = Model.Id;
                 clone.X += offsetX;
                 clone.Y += offsetY;
 
@@ -286,7 +290,7 @@ namespace MyBoard.ViewModel
             SelectItems(pasted);
 
             if (ClipboardService.IsCutOperation)
-                ClipboardService.Items.Clear();
+                ClipboardService.Clear();
         }
 
 
@@ -298,6 +302,7 @@ namespace MyBoard.ViewModel
             foreach (var item in SelectedItems.OfType<ICanvasItemViewModel>().ToList())
             {
                 var clone = CanvasItemClonerService.Clone(item.Model);
+                if (clone is Board duplicatedBoard) duplicatedBoard.ParentBoardId = Model.Id;
                 clone.X += 20;
                 clone.Y += 20;
 

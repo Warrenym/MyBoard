@@ -48,10 +48,11 @@ namespace MyBoard.ViewModel
 
         //Undo and Redo
         public UndoRedoManager UndoRedo { get; } = new();
+        private readonly BoardSaveService boardStorage = new();
 
         public MainViewModel()
         {
-            Board homeBoard = BoardSaveService.Load() ?? new Board { Title = "Home" };
+            Board homeBoard = boardStorage.Load() ?? new Board { Title = "Home" };
             currentBoard = new BoardViewModel(homeBoard, UndoRedo); // pass it in here
             BreadcrumbTrail.Add(currentBoard);
         }
@@ -94,7 +95,7 @@ namespace MyBoard.ViewModel
         private void SaveBoard()
         {
             var rootBoard = BreadcrumbTrail[0].Model; // BreadcrumbTrail[0] is always Home
-            BoardSaveService.Save(rootBoard);
+            boardStorage.Save(rootBoard);
         }
 
 

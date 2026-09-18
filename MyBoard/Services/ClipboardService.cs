@@ -11,19 +11,26 @@ namespace MyBoard.Services
         public static bool IsCutOperation { get; private set; }
 
         public static bool HasContent => Items.Count > 0;
+        internal static Action ClipboardMarker { get; set; } = MarkSystemClipboard;
+
+        public static void Clear()
+        {
+            Items.Clear();
+            IsCutOperation = false;
+        }
 
         public static void SetCopy(IEnumerable<ICanvasItem> items)
         {
             Items = items.Select(CanvasItemClonerService.Clone).ToList();
             IsCutOperation = false;
-            MarkSystemClipboard();
+            ClipboardMarker();
         }
 
         public static void SetCut(IEnumerable<ICanvasItem> items)
         {
             Items = items.Select(CanvasItemClonerService.Clone).ToList();
             IsCutOperation = true;
-            MarkSystemClipboard();
+            ClipboardMarker();
         }
 
         public static bool OwnsSystemClipboard(IDataObject data) =>

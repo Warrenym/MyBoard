@@ -1,82 +1,137 @@
-﻿using MyBoard.Model;
-using System;
-using System.Collections.Generic;
+using MyBoard.Model;
 using System.IO;
-using System.Text;
 using System.Text.Json;
 
-namespace MyBoard.Services
+namespace MyBoard.Services;
+
+// One instance per editing session. Explicit paths never initialize user storage.
+internal sealed class BoardSaveService
 {
-    // Handles saving/loading the entire board tree (Home and everything nested inside it).
-    internal static class BoardSaveService
+    internal const int CurrentVersion = 1;
+    private readonly string path;
+    private readonly Action<string>? beforeCommit;
+    private string? loadedContents;
+    private bool loaded;
+    private bool recovered;
+    private static readonly JsonSerializerOptions Options = new() { WriteIndented = true };
+
+    public BoardSaveService(string? storageFolder = null, Action<string>? beforeCommit = null)
     {
-        private static readonly string SaveFolder = AppStoragePaths.RootFolder;
+        path = Path.Combine(Path.GetFullPath(storageFolder ?? AppStoragePaths.RootFolder), "board.json");
+        this.beforeCommit = beforeCommit;
+    }
 
-        private static readonly string SaveFilePath = Path.Combine(SaveFolder, "board.json");
-
-        // WriteIndented makes the saved file human-readable, useful for debugging early on
-        private static readonly JsonSerializerOptions Options = new() { WriteIndented = true };
-
-        // Serializes the root board (and everything nested inside it) to disk
-        public static void Save(Board rootBoard)
+    public Board? Load()
+    {
+        string? contents = File.Exists(path) ? File.ReadAllText(path) : null;
+        recovered = false;
+        Board? board;
+        try { board = contents is null ? null : Deserialize(contents); }
+        catch (Exception ex) when ((ex is JsonException or InvalidDataException or NotSupportedException)
+                                   && File.Exists(path + ".bak"))
         {
-            string json = JsonSerializer.Serialize(rootBoard, Options);
-            AppStoragePaths.WriteAllTextAtomically(SaveFilePath, json);
+            board = Deserialize(File.ReadAllText(path + ".bak"));
+            recovered = true;
         }
+        loadedContents = contents;
+        loaded = true;
+        return board;
+    }
 
-        // Loads the saved board tree, or returns null if no save file exists yet (e.g. first time running the app)
-        public static Board? Load()
+    public void Save(Board rootBoard)
+    {
+        Validate(rootBoard);
+        var json = JsonSerializer.SerializeToNode(rootBoard, Options)!.AsObject();
+        json["FormatVersion"] = CurrentVersion;
+        string contents = json.ToJsonString(Options);
+        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+        // Keeping the lock-file name avoids a delete/recreate race between processes.
+        using var writeLock = new FileStream(path + ".lock", FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None);
+        string? existing = File.Exists(path) ? File.ReadAllText(path) : null;
+        if (loaded && existing != loadedContents)
+            throw new IOException("The board was changed by another instance. Reload before saving.");
+        if (existing is not null && !recovered)
+            _ = Deserialize(existing); // Never overwrite an unreadable or future-format save.
+        // Preserve the corrupt primary as evidence; never replace the known-good backup with it.
+        string backupPath = recovered ? path + ".corrupt." + Guid.NewGuid().ToString("N") : path + ".bak";
+        AtomicFile.Write(path, contents, backupPath, beforeCommit);
+        loadedContents = contents;
+        loaded = true;
+        recovered = false;
+    }
+
+    private Board Deserialize(string json)
+    {
+        using var parsed = JsonDocument.Parse(json);
+        if (parsed.RootElement.ValueKind != JsonValueKind.Object)
+            throw new InvalidDataException("A board save must contain an object.");
+        if (parsed.RootElement.TryGetProperty("FormatVersion", out var version))
         {
-            if (!File.Exists(SaveFilePath))
-                return null;
+            if (version.ValueKind != JsonValueKind.Number || !version.TryGetInt32(out int number) || number < 1)
+                throw new InvalidDataException("Invalid board format version.");
+            if (number > CurrentVersion) throw new UnsupportedBoardVersionException(number);
+        }
+        Board board = JsonSerializer.Deserialize<Board>(json, Options)
+            ?? throw new InvalidDataException("The save does not contain a board.");
+        Migrate(board);
+        Validate(board);
+        return board;
+    }
 
-            string json = File.ReadAllText(SaveFilePath);
-            var board = JsonSerializer.Deserialize<Board>(json, Options);
-
-            if (board != null)
+    private void Migrate(Board board)
+    {
+        if (board.Items is null) throw new InvalidDataException("Board items cannot be null.");
+        foreach (var item in board.Items)
+        {
+            if (item is NoteItem note)
             {
-                MigrateLegacyNotes(board);
-                ResolveImagePaths(board);
+                note.Document ??= NoteDocument.CreateEmpty();
+                if (!string.IsNullOrEmpty(note.Content) && note.Document.Blocks is not null &&
+                    (note.Document.Blocks.Count == 0 || note.Document.Blocks.All(b =>
+                        b?.Runs is not null && b.Runs.All(r => r is not null && string.IsNullOrEmpty(r.Text)))))
+                    note.Document = new NoteDocument { Blocks = [new NoteBlock { Runs = [new NoteRun { Text = note.Content }] }] };
+                // Do not resurrect legacy text after the user intentionally empties the document.
+                note.Content = null;
             }
-
-            return board;
-        }
-
-        private static void ResolveImagePaths(Board board)
-        {
-            foreach (var item in board.Items)
+            else if (item is ImageItem image && !string.IsNullOrWhiteSpace(image.FilePath) && !File.Exists(image.FilePath))
             {
-                if (item is ImageItem image)
-                    image.FilePath = AppStoragePaths.ResolveImagePath(image.FilePath);
-                else if (item is Board childBoard)
-                    ResolveImagePaths(childBoard);
+                string candidate = Path.Combine(Path.GetDirectoryName(path)!, "Images", Path.GetFileName(image.FilePath));
+                if (File.Exists(candidate)) image.FilePath = candidate;
             }
+            else if (item is Board child) Migrate(child);
         }
+    }
 
-        private static void MigrateLegacyNotes(Board board)
+    private static void Validate(Board board)
+    {
+        if (board.Items is null || board.Title is null || board.Color is null)
+            throw new InvalidDataException("Board properties cannot be null.");
+        foreach (var item in board.Items.Prepend(board))
         {
-            foreach (var item in board.Items)
+            if (item is null || !double.IsFinite(item.X) || !double.IsFinite(item.Y))
+                throw new InvalidDataException("Item coordinates must be finite.");
+            if (item is NoteItem note)
             {
-                if (item is NoteItem note && !string.IsNullOrEmpty(note.Content) &&
-                    (note.Document.Blocks.Count == 0 ||
-                     note.Document.Blocks.All(b => b.Runs.Count == 0)))
-                {
-                    note.Document = new NoteDocument
-                    {
-                        Blocks = new List<NoteBlock>
-                {
-                    new NoteBlock
-                    {
-                        Type = NoteBlockType.Normal,
-                        Runs = new List<NoteRun> { new NoteRun { Text = note.Content } }
-                    }
-                }
-                    };
-                }
-
-                if (item is Board childBoard)
-                    MigrateLegacyNotes(childBoard); // recurse into nested boards
+                ValidateSize(note.Width, note.Height);
+                if (note.Document?.Blocks is null || note.Document.Blocks.Any(b => b?.Runs is null || b.Runs.Any(r => r?.Text is null)))
+                    throw new InvalidDataException("Invalid note document.");
             }
+            if (item is ImageItem image)
+            {
+                ValidateSize(image.Width, image.Height);
+                if (!double.IsFinite(image.AspectRatio) || image.AspectRatio <= 0 || image.FilePath is null)
+                    throw new InvalidDataException("Invalid image properties.");
+            }
+            if (item is Board child && !ReferenceEquals(child, board)) Validate(child);
         }
-    } 
+    }
+
+    private static void ValidateSize(double width, double height)
+    {
+        if (!double.IsFinite(width) || !double.IsFinite(height) || width <= 0 || height <= 0)
+            throw new InvalidDataException("Item dimensions must be finite and positive.");
+    }
 }
+
+internal sealed class UnsupportedBoardVersionException(int version)
+    : IOException($"Board format version {version} is newer than this application supports.");

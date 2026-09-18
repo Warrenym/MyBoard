@@ -33,7 +33,10 @@ namespace MyBoard.Services
                 case Board board:
                     board.Id = Guid.NewGuid();
                     foreach (var child in board.Items)
+                    {
                         AssignNewIds(child);
+                        if (child is Board childBoard) childBoard.ParentBoardId = board.Id;
+                    }
                     break;
             }
         }

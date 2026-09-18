@@ -31,9 +31,12 @@ namespace MyBoard.ViewModel
         public ObservableCollection<string> RecentlyPicked { get; } = new();
 
 
-        public ColorPaletteViewModel()
+        private readonly string? storageFolder;
+
+        public ColorPaletteViewModel(string? storageFolder = null)
         {
-            var data = ColorPaletteService.Load();
+            this.storageFolder = storageFolder;
+            var data = ColorPaletteService.Load(storageFolder);
             foreach (var color in data.SavedColors) SavedColors.Add(color);
             foreach (var color in data.RecentlyPicked) RecentlyPicked.Add(color);
         }
@@ -43,6 +46,7 @@ namespace MyBoard.ViewModel
         // (not on every drag-tick — the caller decides when a "pick" is final, same pattern as how undo/redo only records once per completed edit)
         public void RecordRecentlyPicked(string hex)
         {
+            hex = NormalizeColor(hex);
             // Move to front if it already exists, rather than allowing duplicates
             if (RecentlyPicked.Contains(hex))
                 RecentlyPicked.Remove(hex);
@@ -59,6 +63,7 @@ namespace MyBoard.ViewModel
         // Adds a color to the Saved row — used both by "save this color" from the picker, and by drag-and-drop moves in edit mode later
         public void AddToSaved(string hex)
         {
+            hex = NormalizeColor(hex);
             if (!SavedColors.Contains(hex))
                 SavedColors.Add(hex);
 
@@ -125,7 +130,14 @@ namespace MyBoard.ViewModel
             {
                 SavedColors = SavedColors.ToList(),
                 RecentlyPicked = RecentlyPicked.ToList()
-            });
+            }, storageFolder);
+        }
+
+        private static string NormalizeColor(string hex)
+        {
+            if (string.IsNullOrWhiteSpace(hex) || !System.Text.RegularExpressions.Regex.IsMatch(hex, "^#(?:[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$"))
+                throw new ArgumentException("Use a #RRGGBB or #AARRGGBB color.", nameof(hex));
+            return hex.ToUpperInvariant();
         }
     }
 }
